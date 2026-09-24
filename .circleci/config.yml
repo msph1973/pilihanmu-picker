@@ -16,8 +16,9 @@ jobs:
       - run:
           name: "Pasang Dependensi Header X11 & OpenGL (Fyne)"
           command: |
+            sudo rm -rf /var/lib/apt/lists/*
             sudo apt-get update
-            sudo apt-get install -y --fix-missing gcc libgl1-mesa-dev xorg-dev libwayland-dev libxkbcommon-dev
+            sudo apt-get install -y gcc libgl1-mesa-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxxf86vm-dev libwayland-dev libxkbcommon-dev
       - run:
           name: "Cek Format Kode (gofmt)"
           command: |
