@@ -31,9 +31,9 @@ type Result struct {
 }
 
 // Summary menghasilkan ringkasan pembacaan daftar dalam format ramah pengguna.
-// Contoh: "120 baris → 117 nama unik (3 duplikat dibuang)"
+// Contoh: "120 baris -> 117 nama unik (3 duplikat dibuang)"
 func (r Result) Summary() string {
-	return fmt.Sprintf("%d baris → %d nama unik (%d duplikat dibuang)",
+	return fmt.Sprintf("%d baris -> %d nama unik (%d duplikat dibuang)",
 		r.NonEmptyLinesCount, len(r.Items), r.DuplicateCount)
 }
 

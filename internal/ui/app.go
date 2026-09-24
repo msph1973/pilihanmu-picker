@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -81,8 +82,8 @@ func NewApp(w fyne.Window) *App {
 func (a *App) buildUI() {
 	// 1. Header Aplikasi
 	titleLabel := widget.NewLabelWithStyle(AppTitle, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-	subtitleLabel := widget.NewLabel(AppSubtitle)
-	badgeLabel := widget.NewLabelWithStyle(AppBadgeStatus, fyne.TextAlignTrailing, fyne.TextStyle{Italic: true})
+	subtitleLabel := widget.NewLabelWithStyle(AppSubtitle, fyne.TextAlignLeading, fyne.TextStyle{Italic: true})
+	badgeLabel := widget.NewLabelWithStyle(AppBadgeStatus, fyne.TextAlignTrailing, fyne.TextStyle{Bold: true})
 
 	headerLeft := container.NewVBox(titleLabel, subtitleLabel)
 	headerBar := container.NewBorder(nil, nil, headerLeft, badgeLabel)
@@ -115,63 +116,61 @@ func (a *App) buildUI() {
 	a.updateActionButtonsState()
 }
 
-// createInputSection membuat komponen untuk Langkah 1 (Input Daftar Foto).
+// createInputSection membuat komponen untuk Input Daftar Foto.
 func (a *App) createInputSection() fyne.CanvasObject {
 	sectionTitle := widget.NewLabelWithStyle(SectionInputTitle, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 
 	a.inputEntry = widget.NewMultiLineEntry()
 	a.inputEntry.SetPlaceHolder(InputListPlaceholder)
 	a.inputEntry.Wrapping = fyne.TextWrapWord
-	a.inputEntry.SetMinRowsVisible(6)
+	a.inputEntry.SetMinRowsVisible(7)
 	a.inputEntry.OnChanged = func(s string) {
 		a.listText = s
 		a.parseInputList()
 	}
 
-	scrollInput := container.NewScroll(a.inputEntry)
-
-	btnPaste := widget.NewButtonWithIcon(BtnPasteClipboard, theme.ContentPasteIcon(), func() {
+	btnPaste := widget.NewButtonWithIcon("Tempel", theme.ContentPasteIcon(), func() {
 		clip := a.window.Clipboard().Content()
 		if clip != "" {
 			a.inputEntry.SetText(clip)
 		}
 	})
 
-	btnClear := widget.NewButtonWithIcon(BtnClearInput, theme.DeleteIcon(), func() {
-		a.inputEntry.SetText("")
-	})
-
-	btnFile := widget.NewButtonWithIcon(BtnOpenFile, theme.FolderOpenIcon(), func() {
+	btnFile := widget.NewButtonWithIcon("Buka .txt", theme.FileTextIcon(), func() {
 		dialog.ShowFileOpen(func(reader fyne.URIReadCloser, err error) {
 			if err != nil || reader == nil {
 				return
 			}
 			defer reader.Close()
 
-			res, parseErr := list.ParseReader(reader)
-			if parseErr != nil {
-				dialog.ShowError(fmt.Errorf("Gagal membaca berkas: %w", parseErr), a.window)
+			data, readErr := io.ReadAll(reader)
+			if readErr != nil {
+				dialog.ShowError(fmt.Errorf("Gagal membaca berkas: %w", readErr), a.window)
 				return
 			}
 			a.lastExecutionTitle = reader.URI().Name()
-			a.inputEntry.SetText(strings.Join(res.Items, "\n"))
+			a.inputEntry.SetText(string(data))
 		}, a.window)
+	})
+
+	btnClear := widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {
+		a.inputEntry.SetText("")
 	})
 
 	a.listStatusLabel = widget.NewLabel(LabelListEmpty)
 	a.listStatusLabel.Wrapping = fyne.TextWrapWord
 
 	btnRow := container.NewHBox(btnPaste, btnFile, btnClear)
+	headerRow := container.NewBorder(nil, nil, sectionTitle, btnRow)
 
 	return container.NewVBox(
-		sectionTitle,
-		btnRow,
-		scrollInput,
+		headerRow,
+		a.inputEntry,
 		a.listStatusLabel,
 	)
 }
 
-// createFolderSection membuat komponen untuk Langkah 2 (Folder & Saringan).
+// createFolderSection membuat komponen untuk Folder & Saringan.
 func (a *App) createFolderSection() fyne.CanvasObject {
 	sectionTitle := widget.NewLabelWithStyle(SectionFoldersTitle, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 
@@ -183,7 +182,7 @@ func (a *App) createFolderSection() fyne.CanvasObject {
 		a.triggerAsyncScan()
 	}
 
-	btnBrowseSource := widget.NewButtonWithIcon(BtnBrowseSource, theme.FolderOpenIcon(), func() {
+	btnBrowseSource := widget.NewButtonWithIcon("", theme.FolderOpenIcon(), func() {
 		dialog.ShowFolderOpen(func(list fyne.ListableURI, err error) {
 			if err != nil || list == nil {
 				return
@@ -203,7 +202,7 @@ func (a *App) createFolderSection() fyne.CanvasObject {
 		a.updateActionButtonsState()
 	}
 
-	btnBrowseDest := widget.NewButtonWithIcon(BtnBrowseDest, theme.FolderNewIcon(), func() {
+	btnBrowseDest := widget.NewButtonWithIcon("", theme.FolderOpenIcon(), func() {
 		dialog.ShowFolderOpen(func(list fyne.ListableURI, err error) {
 			if err != nil || list == nil {
 				return
@@ -250,29 +249,29 @@ func (a *App) createFolderSection() fyne.CanvasObject {
 	)
 }
 
-// createPreviewSection membuat komponen untuk Langkah 3 (Pratinjau Pencocokan 4 Keranjang).
+// createPreviewSection membuat komponen untuk Pratinjau Pencocokan 4 Keranjang.
 func (a *App) createPreviewSection() fyne.CanvasObject {
 	sectionTitle := widget.NewLabelWithStyle(SectionPreviewTitle, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 
 	a.statusScanLabel = widget.NewLabel("Pilih folder sumber untuk memindai berkas...")
 	a.statusScanLabel.Wrapping = fyne.TextWrapWord
 
-	a.refreshBtn = widget.NewButtonWithIcon(BtnRefreshPreview, theme.ViewRefreshIcon(), func() {
+	a.refreshBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
 		a.triggerAsyncScan()
 	})
 
 	topRow := container.NewBorder(nil, nil, sectionTitle, a.refreshBtn, a.statusScanLabel)
 
 	// Tombol Aksi Keranjang
-	btnCopyNotFound := widget.NewButtonWithIcon("Lihat / Salin", theme.ContentCopyIcon(), func() {
+	btnViewNotFound := widget.NewButtonWithIcon(BtnViewNotFound, theme.VisibilityIcon(), func() {
 		ShowNotFoundNamesDialog(a.window, a.matchResult.NotFoundNames)
 	})
 
 	// 4 Keranjang
 	a.matchedCard = NewBasketCard(LabelBasketMatched, "0 berkas", "Belum ada berkas cocok", nil)
-	a.notFoundCard = NewBasketCard(LabelBasketNotFound, "0 nama", "Tidak ada catatan", btnCopyNotFound)
-	a.collisionCard = NewBasketCard(LabelBasketCollision, "0 berkas", "Tidak ada tabrakan nama", nil)
-	a.skippedCard = NewBasketCard(LabelBasketSkipped, "0 berkas", "Berkas tidak dipilih klien", nil)
+	a.notFoundCard = NewBasketCard(LabelBasketNotFound, "0 nama", "Semua berkas ditemukan", btnViewNotFound)
+	a.collisionCard = NewBasketCard(LabelBasketCollision, "0 berkas", "Tidak ada nama ganda", nil)
+	a.skippedCard = NewBasketCard(LabelBasketSkipped, "0 berkas", "Format non-RAW / di luar pilihan", nil)
 
 	basketGrid := container.NewGridWithColumns(2,
 		a.matchedCard,
@@ -287,7 +286,7 @@ func (a *App) createPreviewSection() fyne.CanvasObject {
 	)
 }
 
-// createActionSection membuat komponen untuk Langkah 4 (Tombol Tindakan Eksekusi).
+// createActionSection membuat komponen untuk Tombol Tindakan Eksekusi.
 func (a *App) createActionSection() fyne.CanvasObject {
 	sectionTitle := widget.NewLabelWithStyle(SectionActionTitle, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 
@@ -303,7 +302,7 @@ func (a *App) createActionSection() fyne.CanvasObject {
 
 	actionGrid := container.NewGridWithColumns(2, a.copyBtn, a.moveBtn)
 
-	notes := widget.NewLabel("• Salin: Folder sumber tetap utuh.\n• Pindahkan: Berkas sumber dihapus setelah diverifikasi sama ukurannya.")
+	notes := widget.NewLabel("- Salin: Folder sumber tetap utuh aman.\n- Pindahkan: Sumber dihapus hanya setelah ukuran terverifikasi 100% identik.")
 	notes.Wrapping = fyne.TextWrapWord
 
 	return container.NewVBox(
@@ -413,17 +412,17 @@ func (a *App) triggerAsyncScan() {
 
 			a.notFoundCard.SetValues(
 				fmt.Sprintf("%d nama", len(matchRes.NotFoundNames)),
-				"Tidak ditemukan di sumber",
+				"Tidak ada di folder sumber",
 			)
 
 			a.collisionCard.SetValues(
 				fmt.Sprintf("%d berkas", len(matchRes.Collisions)),
-				"Akan otomatis diberi sufiks (2)",
+				"Otomatis diberi akhiran (2)",
 			)
 
 			a.skippedCard.SetValues(
 				fmt.Sprintf("%d berkas", matchRes.SkippedCount),
-				"Berkas sumber tidak dipilih klien",
+				"Bukan pilihan / non-RAW",
 			)
 
 			// Jaring pengaman JPEG (R-U4)
@@ -440,8 +439,8 @@ func (a *App) triggerAsyncScan() {
 
 func (a *App) resetBasketCards() {
 	a.matchedCard.SetValues("0 berkas", "Belum ada berkas cocok")
-	a.notFoundCard.SetValues("0 nama", "Tidak ada catatan")
-	a.collisionCard.SetValues("0 berkas", "Tidak ada tabrakan")
+	a.notFoundCard.SetValues("0 nama", "Semua berkas ditemukan")
+	a.collisionCard.SetValues("0 berkas", "Tidak ada nama ganda")
 	a.skippedCard.SetValues("0 berkas", "0 berkas")
 	a.jpegWarningContainer.Hide()
 }
@@ -626,7 +625,7 @@ func (a *App) showSummaryDialog(res fsops.Result, reportPath, reportContent stri
 	}
 
 	detailText := fmt.Sprintf(
-		"%s\n\n• Berhasil: %d berkas (%s)\n• Gagal: %d berkas\n• Tabrakan nama diselesaikan: %d berkas\n\nBerkas laporan disimpan di:\n%s",
+		"%s\n\n- Berhasil: %d berkas (%s)\n- Gagal: %d berkas\n- Nama ganda diselesaikan: %d berkas\n\nLaporan disimpan di:\n%s",
 		statusMsg,
 		len(res.CopiedFiles),
 		FormatBytes(res.TotalBytesCopied),

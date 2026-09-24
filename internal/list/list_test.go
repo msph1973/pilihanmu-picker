@@ -226,7 +226,7 @@ func TestParseReaderAndEmpty(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		expectedSummary := "3 baris → 2 nama unik (1 duplikat dibuang)"
+		expectedSummary := "3 baris -> 2 nama unik (1 duplikat dibuang)"
 		if res.Summary() != expectedSummary {
 			t.Errorf("expected summary %q, got %q", expectedSummary, res.Summary())
 		}

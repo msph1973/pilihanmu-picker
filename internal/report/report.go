@@ -89,14 +89,14 @@ func Generate(d Data) string {
 
 	// Ringkasan
 	b.WriteString("Ringkasan\n")
-	b.WriteString(fmt.Sprintf("  Cocok         : %d file\n", d.MatchedFilesCount))
-	b.WriteString(fmt.Sprintf("  Tidak ketemu  : %d nama\n", len(d.NotFoundNames)))
-	b.WriteString(fmt.Sprintf("  Tabrakan      : %d\n", len(d.Collisions)))
-	b.WriteString(fmt.Sprintf("  Gagal         : %d\n", len(d.Failures)))
+	b.WriteString(fmt.Sprintf("  Cocok          : %d file\n", d.MatchedFilesCount))
+	b.WriteString(fmt.Sprintf("  Tidak ditemukan: %d nama\n", len(d.NotFoundNames)))
+	b.WriteString(fmt.Sprintf("  Nama ganda     : %d\n", len(d.Collisions)))
+	b.WriteString(fmt.Sprintf("  Gagal          : %d\n", len(d.Failures)))
 	b.WriteString("\n")
 
-	// Tidak ketemu
-	b.WriteString("Tidak ketemu\n")
+	// Tidak ditemukan
+	b.WriteString("Tidak ditemukan\n")
 	if len(d.NotFoundNames) == 0 {
 		b.WriteString("  (tidak ada)\n")
 	} else {
@@ -106,8 +106,8 @@ func Generate(d Data) string {
 	}
 	b.WriteString("\n")
 
-	// Tabrakan
-	b.WriteString("Tabrakan\n")
+	// Nama ganda
+	b.WriteString("Nama ganda\n")
 	if len(d.Collisions) == 0 {
 		b.WriteString("  (tidak ada)\n")
 	} else {

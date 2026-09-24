@@ -4,69 +4,63 @@ package ui
 const (
 	// Info Aplikasi & Header
 	AppTitle       = "Pilihanmu Picker"
-	AppSubtitle    = "Alat Pemindah Berkas RAW Hasil Seleksi Klien"
-	AppBadgeStatus = "100% Offline • Bebas Jaringan • Aman"
+	AppSubtitle    = "Pemilah Berkas RAW Seleksi Klien"
+	AppBadgeStatus = "100% Offline | Aman"
 
-	// Langkah 1: Daftar Foto
-	SectionInputTitle    = "1. Daftar Foto Pilihan Klien"
-	InputListPlaceholder = "Tempel daftar foto dari Dashboard Pilihanmu di sini...\nContoh:\nDSC_0001\nDSC_0002\n_MG_0003"
-	BtnPasteClipboard    = "Tempel dari Clipboard"
-	BtnClearInput        = "Kosongkan"
-	BtnOpenFile          = "Pilih Berkas .txt..."
-	LabelListEmpty       = "Daftar foto belum diisi (masukkan nama berkas atau pilih berkas .txt)"
+	// Panel 1: Daftar Foto
+	SectionInputTitle    = "Daftar Seleksi Klien"
+	InputListPlaceholder = "Tempel daftar foto dari Dashboard Pilihanmu...\nContoh:\nDSC_0001\nDSC_0002\n_MG_0003"
+	LabelListEmpty       = "Tempel daftar foto atau buka berkas .txt hasil seleksi"
 	LabelListInvalidUTF8 = "Format teks tidak valid (harus UTF-8)"
 
-	// Langkah 2: Folder & Saringan
-	SectionFoldersTitle = "2. Lokasi Folder & Pengaturan"
-	LabelSourceFolder   = "Folder Sumber (tempat RAW tersimpan):"
-	LabelDestFolder     = "Folder Tujuan (hasil seleksi):"
-	PlaceholderSource   = "Pilih folder yang berisi berkas RAW fotografer..."
-	PlaceholderDest     = "Pilih folder baru untuk menampung foto terpilih..."
-	BtnBrowseSource     = "Pilih Folder Sumber..."
-	BtnBrowseDest       = "Pilih Folder Tujuan..."
-	CheckRecursive      = "Sertakan sub-folder (pencarian rekursif)"
-	CheckRawFilter      = "Hanya salin format foto RAW"
-	LabelRawFormatsInfo = "Format RAW didukung: CR2, CR3, ARW, NEF, DNG, RAF, ORF, RW2, PEF, 3FR, dll (27 format)"
+	// Panel 2: Folder & Saringan
+	SectionFoldersTitle = "Direktori & Pengaturan"
+	LabelSourceFolder   = "Folder Sumber RAW:"
+	LabelDestFolder     = "Folder Tujuan:"
+	PlaceholderSource   = "Pilih folder sumber RAW..."
+	PlaceholderDest     = "Pilih folder tujuan..."
+	CheckRecursive      = "Cari ke dalam sub-folder (rekursif)"
+	CheckRawFilter      = "Hanya format foto RAW"
+	LabelRawFormatsInfo = "Mendukung 27 format RAW populer (CR2, CR3, ARW, NEF, DNG, RAF, ORF, dll)"
 	WarnSameFolder      = "Folder sumber dan folder tujuan tidak boleh sama!"
-	WarnJPEGOnly        = "Perhatian: Sepertinya Anda memotret format JPEG saja. Matikan centang 'Hanya salin format foto RAW' untuk memproses berkas JPEG."
+	WarnJPEGOnly        = "Perhatian: Folder sumber hanya berisi JPEG. Nonaktifkan filter RAW jika ingin memproses berkas JPEG."
 
-	// Langkah 3: Pratinjau
-	SectionPreviewTitle    = "3. Pratinjau Pencocokan"
-	BtnRefreshPreview      = "Pindai Ulang Folder"
-	StatusScanning         = "Sedang memindai folder sumber..."
+	// Panel 3: Pratinjau
+	SectionPreviewTitle    = "Pratinjau Hasil"
+	StatusScanning         = "Memindai folder sumber..."
 	LabelBasketMatched     = "Cocok"
-	LabelBasketNotFound    = "Tidak Ketemu"
-	LabelBasketCollision   = "Tabrakan Nama"
+	LabelBasketNotFound    = "Tidak Ditemukan"
+	LabelBasketCollision   = "Nama Ganda"
 	LabelBasketSkipped     = "Dilewati"
-	BtnCopyNotFound        = "Salin Daftar Tidak Ketemu"
-	CopiedToClipboardToast = "Daftar nama tidak ketemu berhasil disalin ke clipboard!"
-	LabelNoMatches         = "Belum ada berkas yang cocok ditemukan."
+	BtnViewNotFound        = "Lihat"
+	CopiedToClipboardToast = "Daftar nama berhasil disalin!"
+	LabelNoMatches         = "Tidak ada berkas cocok yang ditemukan."
 
-	// Langkah 4: Tombol Tindakan
-	SectionActionTitle = "4. Eksekusi Tindakan"
-	BtnActionCopy      = "Salin ke Folder Tujuan"
-	BtnActionMove      = "Pindahkan ke Folder Tujuan"
-	TooltipCopy        = "Menyalin berkas terpilih ke folder tujuan. Folder sumber tetap utuh tanpa perubahan."
-	TooltipMove        = "Menyalin ke tujuan, memverifikasi ukuran, lalu menghapus berkas sumber satu per satu."
+	// Panel 4: Tombol Tindakan
+	SectionActionTitle = "Eksekusi"
+	BtnActionCopy      = "Salin ke Tujuan"
+	BtnActionMove      = "Pindahkan ke Tujuan"
+	TooltipCopy        = "Menyalin berkas terpilih ke folder tujuan tanpa mengubah folder sumber."
+	TooltipMove        = "Menyalin ke tujuan, memverifikasi ukuran berkas, lalu menghapus sumber."
 
 	// Konfirmasi Dialog (R-U1)
-	DialogConfirmCopyTitle = "Konfirmasi Salin Berkas"
-	DialogConfirmMoveTitle = "Konfirmasi Pindahkan Berkas (Hapus Sumber)"
+	DialogConfirmCopyTitle = "Konfirmasi Salin"
+	DialogConfirmMoveTitle = "Konfirmasi Pindah (Hapus Sumber)"
 	DialogBtnCancel        = "Batal"
-	DialogBtnProceed       = "Ya, Lanjutkan"
-	DialogMoveWarningText  = "PERINGATAN KESELAMATAN DATA:\nBerkas RAW di folder sumber akan DIHAPUS satu per satu setelah diverifikasi ukurannya sama di folder tujuan.\nPastikan Anda memiliki cadangan (backup) jika diperlukan."
+	DialogBtnProceed       = "Lanjutkan"
+	DialogMoveWarningText  = "PERINGATAN KESELAMATAN DATA:\nBerkas di folder sumber akan DIHAPUS setelah diverifikasi 100% identik di tujuan.\nPastikan Anda memiliki cadangan (backup) bila diperlukan."
 
 	// Modal Progres (R-U3)
 	ProgressTitleExecuting = "Memproses Berkas..."
-	BtnCancelProgress      = "Batalkan Proses"
-	StatusCancelling       = "Membatalkan... Menunggu berkas yang sedang disalin selesai."
+	BtnCancelProgress      = "Batalkan"
+	StatusCancelling       = "Membatalkan... Menunggu operasi saat ini selesai."
 
 	// Hasil Akhir
-	DialogSummaryTitle    = "Hasil Pemrosesan Selesai"
-	SummarySuccessLabel   = "Proses selesai dengan sukses!"
-	SummaryPartialLabel   = "Proses selesai dengan beberapa catatan/kegagalan."
-	SummaryCancelledLabel = "Proses dibatalkan oleh pengguna."
+	DialogSummaryTitle    = "Hasil Pemrosesan"
+	SummarySuccessLabel   = "Pemrosesan selesai dengan sukses!"
+	SummaryPartialLabel   = "Pemrosesan selesai dengan beberapa catatan."
+	SummaryCancelledLabel = "Pemrosesan dibatalkan pengguna."
 	BtnOpenDestFolder     = "Buka Folder Tujuan"
-	BtnViewReport         = "Lihat Berkas Laporan"
+	BtnViewReport         = "Lihat Laporan"
 	BtnClose              = "Tutup"
 )

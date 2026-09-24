@@ -26,41 +26,47 @@ func (t *CustomTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant)
 		if variant == theme.VariantLight {
 			return color.NRGBA{R: 0xf8, G: 0xfa, B: 0xfc, A: 0xff} // Slate-50
 		}
-		return color.NRGBA{R: 0x14, G: 0x16, B: 0x19, A: 0xff} // Neutral dark slate
+		return color.NRGBA{R: 0x12, G: 0x15, B: 0x1a, A: 0xff} // Slate-950 deep
 
 	case theme.ColorNameInputBackground:
 		if variant == theme.VariantLight {
 			return color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
 		}
-		return color.NRGBA{R: 0x1f, G: 0x22, B: 0x27, A: 0xff}
+		return color.NRGBA{R: 0x1a, G: 0x1e, B: 0x24, A: 0xff} // Input dark slate
 
 	case theme.ColorNameOverlayBackground:
 		if variant == theme.VariantLight {
 			return color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xf5}
 		}
-		return color.NRGBA{R: 0x1f, G: 0x22, B: 0x27, A: 0xf5}
+		return color.NRGBA{R: 0x1a, G: 0x1e, B: 0x24, A: 0xf5}
+
+	case theme.ColorNameButton:
+		if variant == theme.VariantLight {
+			return color.NRGBA{R: 0xe2, G: 0xe8, B: 0xf0, A: 0xff} // Slate-200
+		}
+		return color.NRGBA{R: 0x24, G: 0x2a, B: 0x33, A: 0xff} // Button slate
 
 	case theme.ColorNamePrimary:
-		// Biru profesional terukur
-		return color.NRGBA{R: 0x25, G: 0x63, B: 0xeb, A: 0xff}
+		// Biru modern terukur (vibrant blue)
+		return color.NRGBA{R: 0x3b, G: 0x82, B: 0xf6, A: 0xff}
 
 	case theme.ColorNameSuccess:
-		// Hijau sukses
-		return color.NRGBA{R: 0x16, G: 0xa3, B: 0x4a, A: 0xff}
+		// Hijau sukses (emerald)
+		return color.NRGBA{R: 0x22, G: 0xc5, B: 0x5e, A: 0xff}
 
 	case theme.ColorNameWarning:
-		// Kuning/oranye peringatan
-		return color.NRGBA{R: 0xd9, G: 0x77, B: 0x06, A: 0xff}
+		// Amber peringatan
+		return color.NRGBA{R: 0xf5, G: 0x9e, B: 0x0b, A: 0xff}
 
 	case theme.ColorNameError:
-		// Merah kesalahan
-		return color.NRGBA{R: 0xdc, G: 0x26, B: 0x26, A: 0xff}
+		// Crimson kesalahan
+		return color.NRGBA{R: 0xef, G: 0x44, B: 0x44, A: 0xff}
 
 	case theme.ColorNameForeground:
 		if variant == theme.VariantLight {
 			return color.NRGBA{R: 0x0f, G: 0x17, B: 0x2a, A: 0xff} // Slate-900
 		}
-		return color.NRGBA{R: 0xf1, G: 0xf5, B: 0xf9, A: 0xff} // Slate-100
+		return color.NRGBA{R: 0xf8, G: 0xfa, B: 0xfc, A: 0xff} // Slate-50 crisp white
 
 	case theme.ColorNamePlaceHolder:
 		if variant == theme.VariantLight {
@@ -75,7 +81,7 @@ func (t *CustomTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant)
 		return color.NRGBA{R: 0x47, G: 0x55, B: 0x69, A: 0x80}
 
 	case theme.ColorNameShadow:
-		return color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x40}
+		return color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x35}
 
 	default:
 		return t.Theme.Color(name, variant)
@@ -92,9 +98,9 @@ func (t *CustomTheme) Size(name fyne.ThemeSizeName) float32 {
 	case theme.SizeNameText:
 		return 13.0
 	case theme.SizeNameHeadingText:
-		return 18.0
+		return 17.0
 	case theme.SizeNameSubHeadingText:
-		return 15.0
+		return 14.5
 	case theme.SizeNameCaptionText:
 		return 11.5
 	case theme.SizeNameScrollBar:

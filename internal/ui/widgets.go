@@ -82,7 +82,7 @@ func (bc *BasketCard) CreateRenderer() fyne.WidgetRenderer {
 // ShowNotFoundNamesDialog menampilkan dialog daftar nama berkas yang tidak ditemukan.
 func ShowNotFoundNamesDialog(parent fyne.Window, notFound []string) {
 	if len(notFound) == 0 {
-		dialog.ShowInformation("Tidak Ketemu", "Semua nama dalam daftar berhasil ditemukan di folder sumber!", parent)
+		dialog.ShowInformation("Tidak Ditemukan", "Semua nama dalam daftar berhasil ditemukan di folder sumber!", parent)
 		return
 	}
 
@@ -102,14 +102,14 @@ func ShowNotFoundNamesDialog(parent fyne.Window, notFound []string) {
 	scroll := container.NewScroll(entry)
 
 	body := container.NewBorder(
-		widget.NewLabel(fmt.Sprintf("Ditemukan %d nama dari daftar yang tidak memiliki berkas di folder sumber:", len(notFound))),
+		widget.NewLabel(fmt.Sprintf("Ditemukan %d nama dari daftar yang tidak ada di folder sumber:", len(notFound))),
 		copyBtn,
 		nil,
 		nil,
 		scroll,
 	)
 
-	d := dialog.NewCustom("Daftar Nama Tidak Ketemu", "Tutup", body, parent)
+	d := dialog.NewCustom("Daftar Tidak Ditemukan", "Tutup", body, parent)
 	d.Resize(fyne.NewSize(480, 400))
 	d.Show()
 }
