@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -19,6 +20,7 @@ type BasketCard struct {
 	CountText   string
 	SubText     string
 	ActionBtn   *widget.Button
+	AccentColor color.Color
 	titleLabel  *widget.Label
 	countLabel  *widget.Label
 	subLabel    *widget.Label
@@ -26,13 +28,15 @@ type BasketCard struct {
 	container   *fyne.Container
 }
 
-// NewBasketCard membuat card pratinjau untuk keranjang pencocokan.
-func NewBasketCard(title, countText, subText string, actionBtn *widget.Button) *BasketCard {
+// NewBasketCard membuat card pratinjau untuk keranjang pencocokan, dengan garis aksen
+// accentColor di sisi kiri untuk menandai kategori keranjang (mis. hijau untuk Cocok).
+func NewBasketCard(title, countText, subText string, actionBtn *widget.Button, accentColor color.Color) *BasketCard {
 	bc := &BasketCard{
-		Title:     title,
-		CountText: countText,
-		SubText:   subText,
-		ActionBtn: actionBtn,
+		Title:       title,
+		CountText:   countText,
+		SubText:     subText,
+		ActionBtn:   actionBtn,
+		AccentColor: accentColor,
 	}
 	bc.ExtendBaseWidget(bc)
 	bc.initUI()
@@ -57,9 +61,13 @@ func (bc *BasketCard) initUI() {
 		bc.subLabel,
 	)
 
-	// Card berlatar belakang kontras
 	card := widget.NewCard("", "", content)
-	bc.container = container.NewStack(card)
+
+	// Garis aksen warna semantik di sisi kiri (menandai kategori keranjang)
+	bc.bgRectangle = canvas.NewRectangle(bc.AccentColor)
+	bc.bgRectangle.SetMinSize(fyne.NewSize(4, 0))
+
+	bc.container = container.NewBorder(nil, nil, bc.bgRectangle, nil, card)
 }
 
 // SetValues memperbarui angka dan teks keterangan card.

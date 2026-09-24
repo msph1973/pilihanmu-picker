@@ -267,11 +267,11 @@ func (a *App) createPreviewSection() fyne.CanvasObject {
 		ShowNotFoundNamesDialog(a.window, a.matchResult.NotFoundNames)
 	})
 
-	// 4 Keranjang
-	a.matchedCard = NewBasketCard(LabelBasketMatched, "0 berkas", "Belum ada berkas cocok", nil)
-	a.notFoundCard = NewBasketCard(LabelBasketNotFound, "0 nama", "Semua berkas ditemukan", btnViewNotFound)
-	a.collisionCard = NewBasketCard(LabelBasketCollision, "0 berkas", "Tidak ada nama ganda", nil)
-	a.skippedCard = NewBasketCard(LabelBasketSkipped, "0 berkas", "Format non-RAW / di luar pilihan", nil)
+	// 4 Keranjang, masing-masing dengan garis aksen warna semantik sesuai kategorinya
+	a.matchedCard = NewBasketCard(LabelBasketMatched, "0 berkas", "Belum ada berkas cocok", nil, theme.Color(theme.ColorNameSuccess))
+	a.notFoundCard = NewBasketCard(LabelBasketNotFound, "0 nama", "Semua berkas ditemukan", btnViewNotFound, theme.Color(theme.ColorNameError))
+	a.collisionCard = NewBasketCard(LabelBasketCollision, "0 berkas", "Tidak ada nama ganda", nil, theme.Color(theme.ColorNameWarning))
+	a.skippedCard = NewBasketCard(LabelBasketSkipped, "0 berkas", "Format non-RAW / di luar pilihan", nil, theme.Color(theme.ColorNamePlaceHolder))
 
 	basketGrid := container.NewGridWithColumns(2,
 		a.matchedCard,
@@ -491,11 +491,21 @@ func (a *App) confirmAndExecute(mode fsops.OpMode) {
 			totalFiles, totalSize, a.sourceDir, a.destDir, DialogMoveWarningText)
 	}
 
-	dialog.ShowConfirm(title, message, func(confirmed bool) {
+	content := widget.NewLabel(message)
+	content.Wrapping = fyne.TextWrapWord
+
+	confirmDialog := dialog.NewCustomConfirm(title, DialogBtnProceed, DialogBtnCancel, content, func(confirmed bool) {
 		if confirmed {
 			a.startExecution(mode)
 		}
 	}, a.window)
+
+	if mode == fsops.ModeMove {
+		confirmDialog.SetConfirmImportance(widget.DangerImportance)
+	}
+
+	confirmDialog.Resize(fyne.NewSize(480, 260))
+	confirmDialog.Show()
 }
 
 // startExecution mengeksekusi operasi salin/pindah dengan modal progres dan pembatalan (R-U3, R-A4).

@@ -62,8 +62,9 @@ func TestCustomTheme(t *testing.T) {
 }
 
 func TestBasketCard(t *testing.T) {
+	test.NewApp()
 	btn := widget.NewButton("Aksi", func() {})
-	card := NewBasketCard("Keranjang Uji", "10 berkas", "Keterangan", btn)
+	card := NewBasketCard("Keranjang Uji", "10 berkas", "Keterangan", btn, theme.Color(theme.ColorNamePrimary))
 
 	if card.Title != "Keranjang Uji" {
 		t.Errorf("expected title %q, got %q", "Keranjang Uji", card.Title)
