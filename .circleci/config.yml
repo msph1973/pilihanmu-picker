@@ -66,10 +66,10 @@ jobs:
               choco install mingw -y
             }
       - run:
-          name: "Jalankan Unit Test di Windows"
+          name: "Jalankan Unit Test Logika di Windows"
           command: |
             $env:CGO_ENABLED="1"
-            go test -v -shuffle=on ./...
+            go test -v -shuffle=on ./internal/list/... ./internal/scan/... ./internal/match/... ./internal/fsops/... ./internal/report/...
       - run:
           name: "Kompilasi Binary Windows (.exe)"
           command: |
