@@ -26,22 +26,19 @@ const (
 	WarnJPEGOnly        = "Perhatian: Folder sumber hanya berisi JPEG. Nonaktifkan filter RAW jika ingin memproses berkas JPEG."
 
 	// Panel 3: Pratinjau
-	SectionPreviewTitle    = "Pratinjau Hasil"
-	StatusScanning         = "Memindai folder sumber..."
-	LabelBasketMatched     = "Cocok"
-	LabelBasketNotFound    = "Tidak Ditemukan"
-	LabelBasketCollision   = "Nama Ganda"
-	LabelBasketSkipped     = "Dilewati"
-	BtnViewNotFound        = "Lihat"
-	CopiedToClipboardToast = "Daftar nama berhasil disalin!"
-	LabelNoMatches         = "Tidak ada berkas cocok yang ditemukan."
+	SectionPreviewTitle  = "Pratinjau Hasil"
+	StatusScanning       = "Memindai folder sumber..."
+	LabelBasketMatched   = "Cocok"
+	LabelBasketNotFound  = "Tidak Ditemukan"
+	LabelBasketCollision = "Nama Ganda"
+	LabelBasketSkipped   = "Dilewati"
+	BtnViewNotFound      = "Lihat"
+	LabelNoMatches       = "Tidak ada berkas cocok yang ditemukan."
 
 	// Panel 4: Tombol Tindakan
 	SectionActionTitle = "Eksekusi"
 	BtnActionCopy      = "Salin ke Tujuan"
 	BtnActionMove      = "Pindahkan ke Tujuan"
-	TooltipCopy        = "Menyalin berkas terpilih ke folder tujuan tanpa mengubah folder sumber."
-	TooltipMove        = "Menyalin ke tujuan, memverifikasi ukuran berkas, lalu menghapus sumber."
 
 	// Konfirmasi Dialog (R-U1)
 	DialogConfirmCopyTitle = "Konfirmasi Salin"
