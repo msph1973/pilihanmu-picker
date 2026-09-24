@@ -17,7 +17,7 @@ jobs:
           name: "Pasang Dependensi Header X11 & OpenGL (Fyne)"
           command: |
             sudo apt-get update
-            sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev
+            sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev libwayland-dev
       - run:
           name: "Cek Format Kode (gofmt)"
           command: |
