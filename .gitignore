@@ -1,0 +1,34 @@
+# Binaries and executables
+/pilihanmu-picker
+/pilihanmu-picker.exe
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.AppImage
+
+# Test artifacts
+*.test
+__debug_bin*
+
+# Build outputs and tools
+fyne-cross/
+bin/
+dist/
+
+# Archives and large files
+*.zip
+*.tar.gz
+*.rar
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# IDE and editor settings
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
