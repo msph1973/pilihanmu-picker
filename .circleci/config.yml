@@ -1,0 +1,89 @@
+version: 2.1
+
+orbs:
+  win: circleci/windows@5.0.0
+
+jobs:
+  test-linux:
+    docker:
+      - image: cimg/go:1.22
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - go-mod-v1-{{ checksum "go.mod" }}
+            - go-mod-v1-
+      - run:
+          name: "Pasang Dependensi Header X11 & OpenGL (Fyne)"
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev
+      - run:
+          name: "Cek Format Kode (gofmt)"
+          command: |
+            if [ -n "$(gofmt -l .)" ]; then
+              echo "Kode belum diformat dengan gofmt:"
+              gofmt -l .
+              exit 1
+            fi
+      - run:
+          name: "Verifikasi Modul (go mod tidy)"
+          command: |
+            go mod tidy
+            if [ -n "$(git status --porcelain go.mod go.sum)" ]; then
+              echo "go.mod atau go.sum tidak sinkron. Jalankan 'go mod tidy'"
+              git status --porcelain go.mod go.sum
+              exit 1
+            fi
+      - run:
+          name: "Static Analysis (go vet)"
+          command: go vet ./...
+      - run:
+          name: "Jalankan Unit Test (-race & -shuffle)"
+          command: go test -v -race -shuffle=on ./...
+      - save_cache:
+          key: go-mod-v1-{{ checksum "go.mod" }}
+          paths:
+            - "/go/pkg/mod"
+            - "~/.cache/go-build"
+      - run:
+          name: "Build Binary Linux"
+          command: go build -v ./...
+
+  build-windows:
+    executor:
+      name: win/default
+      size: "medium"
+    steps:
+      - checkout
+      - run:
+          name: "Verifikasi / Pasang Toolchain (Go & MinGW)"
+          command: |
+            if (!(Get-Command go -ErrorAction SilentlyContinue)) {
+              choco install golang -y
+            }
+            if (!(Get-Command gcc -ErrorAction SilentlyContinue)) {
+              choco install mingw -y
+            }
+      - run:
+          name: "Jalankan Unit Test di Windows"
+          command: |
+            $env:CGO_ENABLED="1"
+            go test -v -shuffle=on ./...
+      - run:
+          name: "Kompilasi Binary Windows (.exe)"
+          command: |
+            $env:CGO_ENABLED="1"
+            go build -v -ldflags="-H windowsgui -s -w" -o pilihanmu-picker.exe ./cmd/pilihanmu-picker
+      - store_artifacts:
+          path: pilihanmu-picker.exe
+          destination: pilihanmu-picker.exe
+
+workflows:
+  version: 2
+  pipeline:
+    jobs:
+      - test-linux
+      - build-windows:
+          requires:
+            - test-linux
