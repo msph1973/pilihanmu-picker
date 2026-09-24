@@ -57,6 +57,10 @@ jobs:
       size: "medium"
     steps:
       - checkout
+      - restore_cache:
+          keys:
+            - go-mod-win-v1-{{ checksum "go.mod" }}
+            - go-mod-win-v1-
       - run:
           name: "Verifikasi / Pasang Toolchain (Go & MinGW)"
           command: |
@@ -73,9 +77,15 @@ jobs:
             go test -v -shuffle=on ./internal/list/... ./internal/scan/... ./internal/match/... ./internal/fsops/... ./internal/report/...
       - run:
           name: "Kompilasi Binary Windows (.exe)"
+          no_output_timeout: 30m
           command: |
             $env:CGO_ENABLED="1"
             go build -v -ldflags="-H windowsgui -s -w" -o pilihanmu-picker.exe ./cmd/pilihanmu-picker
+      - save_cache:
+          key: go-mod-win-v1-{{ checksum "go.mod" }}
+          paths:
+            - "C:\\Users\\circleci\\go\\pkg\\mod"
+            - "C:\\Users\\circleci\\AppData\\Local\\go-build"
       - store_artifacts:
           path: pilihanmu-picker.exe
           destination: pilihanmu-picker.exe
