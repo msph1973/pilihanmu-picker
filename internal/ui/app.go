@@ -27,10 +27,15 @@ type App struct {
 	window fyne.Window
 
 	// State internal
-	listText          string
-	listResult        list.Result
-	sourceDir         string
-	destDir           string
+	listText   string
+	listResult list.Result
+	sourceDir  string
+	destDir    string
+	// listDestFiles adalah pintu I/O pembacaan nama berkas di folder tujuan (R-A6). Disimpan
+	// sebagai field yang bisa disuntik supaya jalur peringatan R-C2 dapat diuji secara
+	// deterministik di semua OS — memicunya lewat error filesystem tidak portabel (folder tujuan
+	// berupa berkas biasa menghasilkan error di Linux tetapi tidak di Windows).
+	listDestFiles     func(string) ([]string, error)
 	includeSubfolders bool
 	rawFilterEnabled  bool
 	// isScanning dan isExecuting dibaca dari updateActionButtonsState (bisa dipanggil dari
@@ -87,6 +92,7 @@ func NewApp(w fyne.Window) *App {
 		window:            w,
 		includeSubfolders: true, // Default aktif (PRD §4.3)
 		rawFilterEnabled:  true, // Default aktif (PRD §4.4)
+		listDestFiles:     fsops.ListDestFileNames,
 	}
 
 	a.buildUI()
@@ -384,6 +390,7 @@ func (a *App) triggerAsyncScan() {
 	recursive := a.includeSubfolders
 	rawFilter := a.rawFilterEnabled
 	targets := a.listResult.Items
+	listDestFiles := a.listDestFiles
 
 	go func() {
 		// 1. Pindai berkas sumber
@@ -394,8 +401,9 @@ func (a *App) triggerAsyncScan() {
 
 		// 2. Baca nama berkas di tujuan jika direktori tujuan sudah ada.
 		// R-A6: satu-satunya pintu I/O berkas adalah internal/fsops, jadi pembacaan dilakukan
-		// lewat fsops.ListDestFileNames, bukan os.ReadDir langsung di lapisan UI.
-		destFiles, destErr := fsops.ListDestFileNames(destDir)
+		// lewat listDestFiles (default fsops.ListDestFileNames), bukan os.ReadDir langsung di
+		// lapisan UI.
+		destFiles, destErr := listDestFiles(destDir)
 
 		// 3. Lakukan pencocokan 4 keranjang
 		matchRes := match.Match(targets, scanRes.Files, match.Options{

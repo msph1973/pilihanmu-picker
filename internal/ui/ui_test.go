@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -278,8 +279,11 @@ func TestTriggerAsyncScanFullFlow(t *testing.T) {
 }
 
 // TestTriggerAsyncScanDestReadWarning membuktikan perbaikan R-C2: kegagalan membaca folder tujuan
-// (mis. path tujuan ternyata sebuah berkas, bukan direktori) WAJIB dilaporkan di label status,
-// bukan ditelan diam-diam lewat os.ReadDir langsung seperti pada kode lama.
+// WAJIB dilaporkan di label status, bukan ditelan diam-diam.
+//
+// Kegagalan DISUNTIK lewat field listDestFiles, bukan dipicu dengan menjadikan folder tujuan
+// sebuah berkas biasa: pemicu lama menghasilkan error di Linux (ENOTDIR) tetapi TIDAK di Windows,
+// sehingga tes ini gagal di CI windows-latest. Dengan suntikan ini jalurnya identik di semua OS.
 //
 // Catatan: pemicu memakai pengisian field + triggerAsyncScan() langsung (lihat komentar di
 // TestTriggerAsyncScanFullFlow soal kenapa Entry.SetText() dihindari di sini).
@@ -293,14 +297,10 @@ func TestTriggerAsyncScanDestReadWarning(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// destDir menunjuk ke berkas biasa (bukan direktori) -> fsops.ListDestFileNames gagal dengan
-	// error selain "tidak ditemukan", yang WAJIB ditampilkan, bukan ditelan.
-	blockingFile := filepath.Join(t.TempDir(), "blocker.txt")
-	if err := os.WriteFile(blockingFile, []byte("x"), 0644); err != nil {
-		t.Fatal(err)
+	a.listDestFiles = func(string) ([]string, error) {
+		return nil, errors.New("destination directory is not readable")
 	}
-
-	a.destDir = blockingFile
+	a.destDir = t.TempDir()
 	a.listResult = list.Result{Items: []string{"DSC_0001"}}
 	a.sourceDir = srcDir
 
