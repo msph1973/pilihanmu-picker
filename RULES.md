@@ -142,7 +142,7 @@ Aturan ini berlaku untuk seluruh isi repo. Bila berbenturan dengan `PRD.md`,
   konfirmasi eksplisit.** Tidak ada eksekusi otomatis, tidak ada "jangan tanya lagi".
 
 - **R-U2 — Pratinjau tidak boleh diringkas jadi satu angka.** Empat keranjang
-  (cocok / tidak ketemu / tabrakan / sudah ada di tujuan) harus terlihat, dan
+  (cocok / tidak ketemu / tabrakan / dilewati) harus terlihat, dan
   daftar nama yang tidak ketemu harus bisa dibaca dan disalin.
 
 - **R-U3 — Progres terlihat dan bisa dibatalkan.** Pembatalan menghentikan setelah

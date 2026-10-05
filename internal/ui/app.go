@@ -2,11 +2,11 @@ package ui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -27,14 +27,29 @@ type App struct {
 	window fyne.Window
 
 	// State internal
-	listText           string
-	listResult         list.Result
-	sourceDir          string
-	destDir            string
-	includeSubfolders  bool
-	rawFilterEnabled   bool
-	isScanning         bool
-	isExecuting        bool
+	listText          string
+	listResult        list.Result
+	sourceDir         string
+	destDir           string
+	includeSubfolders bool
+	rawFilterEnabled  bool
+	// isScanning dan isExecuting dibaca dari updateActionButtonsState (bisa dipanggil dari
+	// berbagai pemicu UI) dan ditulis dari dalam goroutine latar belakang lewat fyne.Do; pada
+	// driver tes, fyne.Do berjalan langsung di goroutine pemanggilnya (bukan goroutine UI
+	// khusus), sehingga kedua flag ini dibuat atomic agar aman dibaca/ditulis lintas goroutine
+	// tanpa pengecualian, bukan hanya mengandalkan konvensi "selalu lewat goroutine UI".
+	isScanning  atomic.Bool
+	isExecuting atomic.Bool
+	// asyncGeneration dinaikkan (Add 1) sebagai pernyataan PALING TERAKHIR pada setiap callback
+	// fyne.Do yang menandai tuntasnya satu siklus pembaruan UI asinkron (pemindaian atau
+	// eksekusi). isScanning/isExecuting sengaja di-set false LEBIH AWAL pada callback yang sama
+	// (sebelum updateActionButtonsState dipanggil, agar tombol dievaluasi dengan status
+	// terbaru) sehingga keduanya TIDAK bisa dipakai sebagai sinyal "seluruh pembaruan widget
+	// pada goroutine ini sudah rampung". asyncGeneration mengisi celah itu lewat happens-before
+	// bawaan operasi atomic: begitu nilainya teramati naik, seluruh pernyataan sebelumnya pada
+	// goroutine yang sama dijamin sudah selesai. Dipakai terutama oleh tes untuk menunggu
+	// goroutine latar belakang benar-benar tuntas sebelum memeriksa state/dialog.
+	asyncGeneration    atomic.Uint64
 	scanResult         scan.Result
 	matchResult        match.Result
 	execContextCancel  context.CancelFunc
@@ -129,14 +144,14 @@ func (a *App) createInputSection() fyne.CanvasObject {
 		a.parseInputList()
 	}
 
-	btnPaste := widget.NewButtonWithIcon("Tempel", theme.ContentPasteIcon(), func() {
+	btnPaste := widget.NewButtonWithIcon(BtnPasteList, theme.ContentPasteIcon(), func() {
 		clip := a.window.Clipboard().Content()
 		if clip != "" {
 			a.inputEntry.SetText(clip)
 		}
 	})
 
-	btnFile := widget.NewButtonWithIcon("Buka .txt", theme.FileTextIcon(), func() {
+	btnFile := widget.NewButtonWithIcon(BtnOpenTxtFile, theme.FileTextIcon(), func() {
 		dialog.ShowFileOpen(func(reader fyne.URIReadCloser, err error) {
 			if err != nil || reader == nil {
 				return
@@ -145,7 +160,7 @@ func (a *App) createInputSection() fyne.CanvasObject {
 
 			data, readErr := io.ReadAll(reader)
 			if readErr != nil {
-				dialog.ShowError(fmt.Errorf("Gagal membaca berkas: %w", readErr), a.window)
+				dialog.ShowError(fmt.Errorf(FmtErrReadFile, readErr), a.window)
 				return
 			}
 			a.lastExecutionTitle = reader.URI().Name()
@@ -227,13 +242,13 @@ func (a *App) createFolderSection() fyne.CanvasObject {
 	})
 	a.rawFilterCheck.Checked = a.rawFilterEnabled
 
-	rawInfoLabel := widget.NewLabelWithStyle(LabelRawFormatsInfo, fyne.TextAlignLeading, fyne.TextStyle{Italic: true})
+	rawInfoLabel := widget.NewLabelWithStyle(fmt.Sprintf(FmtRawFormatsInfo, len(scan.RawExtensions)), fyne.TextAlignLeading, fyne.TextStyle{Italic: true})
 	rawInfoLabel.Wrapping = fyne.TextWrapWord
 
 	// Jaring Pengaman JPEG (R-U4)
 	a.jpegWarningLabel = widget.NewLabel(WarnJPEGOnly)
 	a.jpegWarningLabel.Wrapping = fyne.TextWrapWord
-	a.jpegWarningCard = widget.NewCard("", "Jaring Pengaman Format", a.jpegWarningLabel)
+	a.jpegWarningCard = widget.NewCard("", CardTitleJPEGSafetyNet, a.jpegWarningLabel)
 	a.jpegWarningContainer = container.NewVBox(a.jpegWarningCard)
 	a.jpegWarningContainer.Hide() // Sembunyi default sampai terdeteksi
 
@@ -253,7 +268,7 @@ func (a *App) createFolderSection() fyne.CanvasObject {
 func (a *App) createPreviewSection() fyne.CanvasObject {
 	sectionTitle := widget.NewLabelWithStyle(SectionPreviewTitle, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 
-	a.statusScanLabel = widget.NewLabel("Pilih folder sumber untuk memindai berkas...")
+	a.statusScanLabel = widget.NewLabel(StatusSelectSourceFolder)
 	a.statusScanLabel.Wrapping = fyne.TextWrapWord
 
 	a.refreshBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
@@ -267,11 +282,15 @@ func (a *App) createPreviewSection() fyne.CanvasObject {
 		ShowNotFoundNamesDialog(a.window, a.matchResult.NotFoundNames)
 	})
 
+	btnViewCollisions := widget.NewButtonWithIcon(BtnViewCollisions, theme.VisibilityIcon(), func() {
+		ShowCollisionsDialog(a.window, a.matchResult.Collisions)
+	})
+
 	// 4 Keranjang, masing-masing dengan garis aksen warna semantik sesuai kategorinya
-	a.matchedCard = NewBasketCard(LabelBasketMatched, "0 berkas", "Belum ada berkas cocok", nil, theme.Color(theme.ColorNameSuccess))
-	a.notFoundCard = NewBasketCard(LabelBasketNotFound, "0 nama", "Semua berkas ditemukan", btnViewNotFound, theme.Color(theme.ColorNameError))
-	a.collisionCard = NewBasketCard(LabelBasketCollision, "0 berkas", "Tidak ada nama ganda", nil, theme.Color(theme.ColorNameWarning))
-	a.skippedCard = NewBasketCard(LabelBasketSkipped, "0 berkas", "Format non-RAW / di luar pilihan", nil, theme.Color(theme.ColorNamePlaceHolder))
+	a.matchedCard = NewBasketCard(LabelBasketMatched, LabelZeroFiles, SubMatchedInitial, nil, theme.Color(theme.ColorNameSuccess))
+	a.notFoundCard = NewBasketCard(LabelBasketNotFound, LabelZeroNames, SubNotFoundInitial, btnViewNotFound, theme.Color(theme.ColorNameError))
+	a.collisionCard = NewBasketCard(LabelBasketCollision, LabelZeroFiles, SubCollisionInitial, btnViewCollisions, theme.Color(theme.ColorNameWarning))
+	a.skippedCard = NewBasketCard(LabelBasketSkipped, LabelZeroFiles, SubSkippedInitial, nil, theme.Color(theme.ColorNamePlaceHolder))
 
 	basketGrid := container.NewGridWithColumns(2,
 		a.matchedCard,
@@ -302,7 +321,7 @@ func (a *App) createActionSection() fyne.CanvasObject {
 
 	actionGrid := container.NewGridWithColumns(2, a.copyBtn, a.moveBtn)
 
-	notes := widget.NewLabel("- Salin: Folder sumber tetap utuh aman.\n- Pindahkan: Sumber dihapus hanya setelah ukuran terverifikasi 100% identik.")
+	notes := widget.NewLabel(NoteActionSection)
 	notes.Wrapping = fyne.TextWrapWord
 
 	return container.NewVBox(
@@ -344,18 +363,18 @@ func (a *App) updateListStatus() {
 // triggerAsyncScan memicu pemindaian dan pencocokan di goroutine latar belakang (R-A4).
 func (a *App) triggerAsyncScan() {
 	if a.sourceDir == "" {
-		a.statusScanLabel.SetText("Pilih folder sumber untuk memulai pencarian.")
+		a.statusScanLabel.SetText(StatusSelectSourceStart)
 		a.resetBasketCards()
 		a.updateActionButtonsState()
 		return
 	}
 
 	// Jangan tumpuk scan jika sedang berjalan
-	if a.isScanning {
+	if a.isScanning.Load() {
 		return
 	}
 
-	a.isScanning = true
+	a.isScanning.Store(true)
 	a.statusScanLabel.SetText(StatusScanning)
 	a.refreshBtn.Disable()
 	a.updateActionButtonsState()
@@ -373,16 +392,10 @@ func (a *App) triggerAsyncScan() {
 			Recursive: recursive,
 		})
 
-		// 2. Baca nama berkas di tujuan jika direktori tujuan sudah ada
-		var destFiles []string
-		if destDir != "" {
-			entries, _ := os.ReadDir(destDir)
-			for _, entry := range entries {
-				if !entry.IsDir() {
-					destFiles = append(destFiles, entry.Name())
-				}
-			}
-		}
+		// 2. Baca nama berkas di tujuan jika direktori tujuan sudah ada.
+		// R-A6: satu-satunya pintu I/O berkas adalah internal/fsops, jadi pembacaan dilakukan
+		// lewat fsops.ListDestFileNames, bukan os.ReadDir langsung di lapisan UI.
+		destFiles, destErr := fsops.ListDestFileNames(destDir)
 
 		// 3. Lakukan pencocokan 4 keranjang
 		matchRes := match.Match(targets, scanRes.Files, match.Options{
@@ -392,13 +405,19 @@ func (a *App) triggerAsyncScan() {
 
 		// 4. Perbarui antarmuka di UI thread
 		fyne.Do(func() {
-			a.isScanning = false
+			a.isScanning.Store(false)
 			a.refreshBtn.Enable()
 
-			if err != nil {
-				a.statusScanLabel.SetText(fmt.Sprintf("Peringatan pemindaian: %v", err))
-			} else {
-				a.statusScanLabel.SetText(fmt.Sprintf("Pindai selesai: %d total berkas ditemukan di sumber.", len(scanRes.Files)))
+			// R-C2: peringatan pemindaian maupun pembacaan folder tujuan tidak pernah ditelan diam-diam.
+			switch {
+			case err != nil && destErr != nil:
+				a.statusScanLabel.SetText(fmt.Sprintf(FmtScanAndDestWarning, err, destErr))
+			case err != nil:
+				a.statusScanLabel.SetText(fmt.Sprintf(FmtScanWarning, err))
+			case destErr != nil:
+				a.statusScanLabel.SetText(fmt.Sprintf(FmtDestReadWarning, destErr))
+			default:
+				a.statusScanLabel.SetText(fmt.Sprintf(FmtScanComplete, len(scanRes.Files)))
 			}
 
 			a.scanResult = scanRes
@@ -406,23 +425,23 @@ func (a *App) triggerAsyncScan() {
 
 			// Perbarui 4 Keranjang
 			a.matchedCard.SetValues(
-				fmt.Sprintf("%d berkas", matchRes.TotalMatchedFiles),
-				fmt.Sprintf("Total ukuran: %s", FormatBytes(matchRes.TotalMatchedSize)),
+				fmt.Sprintf(FmtCountFiles, matchRes.TotalMatchedFiles),
+				fmt.Sprintf(FmtTotalSize, FormatBytes(matchRes.TotalMatchedSize)),
 			)
 
 			a.notFoundCard.SetValues(
-				fmt.Sprintf("%d nama", len(matchRes.NotFoundNames)),
-				"Tidak ada di folder sumber",
+				fmt.Sprintf(FmtCountNames, len(matchRes.NotFoundNames)),
+				SubNotFoundAfterScan,
 			)
 
 			a.collisionCard.SetValues(
-				fmt.Sprintf("%d berkas", len(matchRes.Collisions)),
-				"Otomatis diberi akhiran (2)",
+				fmt.Sprintf(FmtCountFiles, len(matchRes.Collisions)),
+				SubCollisionAfterScan,
 			)
 
 			a.skippedCard.SetValues(
-				fmt.Sprintf("%d berkas", matchRes.SkippedCount),
-				"Bukan pilihan / non-RAW",
+				fmt.Sprintf(FmtCountFiles, matchRes.SkippedCount),
+				SubSkippedAfterScan,
 			)
 
 			// Jaring pengaman JPEG (R-U4)
@@ -433,22 +452,23 @@ func (a *App) triggerAsyncScan() {
 			}
 
 			a.updateActionButtonsState()
+			a.asyncGeneration.Add(1)
 		})
 	}()
 }
 
 func (a *App) resetBasketCards() {
-	a.matchedCard.SetValues("0 berkas", "Belum ada berkas cocok")
-	a.notFoundCard.SetValues("0 nama", "Semua berkas ditemukan")
-	a.collisionCard.SetValues("0 berkas", "Tidak ada nama ganda")
-	a.skippedCard.SetValues("0 berkas", "0 berkas")
+	a.matchedCard.SetValues(LabelZeroFiles, SubMatchedInitial)
+	a.notFoundCard.SetValues(LabelZeroNames, SubNotFoundInitial)
+	a.collisionCard.SetValues(LabelZeroFiles, SubCollisionInitial)
+	a.skippedCard.SetValues(LabelZeroFiles, SubSkippedInitial)
 	a.jpegWarningContainer.Hide()
 }
 
 // updateActionButtonsState memperbarui status aktif/nonaktif tombol eksekusi (R-P4).
 func (a *App) updateActionButtonsState() {
-	canExecute := !a.isScanning &&
-		!a.isExecuting &&
+	canExecute := !a.isScanning.Load() &&
+		!a.isExecuting.Load() &&
 		a.sourceDir != "" &&
 		a.destDir != "" &&
 		a.sourceDir != a.destDir &&
@@ -466,12 +486,12 @@ func (a *App) updateActionButtonsState() {
 // confirmAndExecute menampilkan dialog konfirmasi eksplisit sebelum menjalankan aksi (R-U1).
 func (a *App) confirmAndExecute(mode fsops.OpMode) {
 	if a.sourceDir == a.destDir {
-		dialog.ShowError(fmt.Errorf(WarnSameFolder), a.window)
+		dialog.ShowError(errors.New(WarnSameFolder), a.window)
 		return
 	}
 
 	if a.matchResult.TotalMatchedFiles == 0 {
-		dialog.ShowInformation("Tidak Ada Berkas", LabelNoMatches, a.window)
+		dialog.ShowInformation(DialogNoFilesTitle, LabelNoMatches, a.window)
 		return
 	}
 
@@ -483,12 +503,10 @@ func (a *App) confirmAndExecute(mode fsops.OpMode) {
 
 	if mode == fsops.ModeCopy {
 		title = DialogConfirmCopyTitle
-		message = fmt.Sprintf("Anda akan MENYALIN %d berkas foto (%s) ke folder tujuan.\n\nSumber: %s\nTujuan: %s\n\nFolder sumber tidak akan diubah atau dihapus.",
-			totalFiles, totalSize, a.sourceDir, a.destDir)
+		message = fmt.Sprintf(FmtConfirmCopyMessage, totalFiles, totalSize, a.sourceDir, a.destDir)
 	} else {
 		title = DialogConfirmMoveTitle
-		message = fmt.Sprintf("Anda akan MEMINDAHKAN %d berkas foto (%s) ke folder tujuan.\n\nSumber: %s\nTujuan: %s\n\n%s",
-			totalFiles, totalSize, a.sourceDir, a.destDir, DialogMoveWarningText)
+		message = fmt.Sprintf(FmtConfirmMoveMessage, totalFiles, totalSize, a.sourceDir, a.destDir, DialogMoveWarningText)
 	}
 
 	content := widget.NewLabel(message)
@@ -510,7 +528,7 @@ func (a *App) confirmAndExecute(mode fsops.OpMode) {
 
 // startExecution mengeksekusi operasi salin/pindah dengan modal progres dan pembatalan (R-U3, R-A4).
 func (a *App) startExecution(mode fsops.OpMode) {
-	a.isExecuting = true
+	a.isExecuting.Store(true)
 	a.updateActionButtonsState()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -520,10 +538,10 @@ func (a *App) startExecution(mode fsops.OpMode) {
 	progressBar := widget.NewProgressBar()
 	progressBar.SetValue(0)
 
-	fileLabel := widget.NewLabel("Menyiapkan pemrosesan...")
+	fileLabel := widget.NewLabel(StatusPreparingExecution)
 	fileLabel.Wrapping = fyne.TextWrapWord
 
-	byteLabel := widget.NewLabel("0 B / " + FormatBytes(a.matchResult.TotalMatchedSize))
+	byteLabel := widget.NewLabel(fmt.Sprintf(FmtByteProgressInitial, FormatBytes(a.matchResult.TotalMatchedSize)))
 
 	var progressDialog dialog.Dialog
 
@@ -549,7 +567,7 @@ func (a *App) startExecution(mode fsops.OpMode) {
 	matchedItems := a.matchResult.Matched
 	listTitle := a.lastExecutionTitle
 	if listTitle == "" {
-		listTitle = "Daftar Teks"
+		listTitle = LabelDefaultListTitle
 	}
 	uniqueTargets := len(a.listResult.Items)
 	notFoundList := a.matchResult.NotFoundNames
@@ -558,7 +576,7 @@ func (a *App) startExecution(mode fsops.OpMode) {
 		startTime := time.Now()
 
 		// Jalankan operasi fsops
-		execRes, _ := fsops.Execute(ctx, fsops.Options{
+		execRes, execErr := fsops.Execute(ctx, fsops.Options{
 			Mode:         mode,
 			SourceDir:    sourceDir,
 			DestDir:      destDir,
@@ -568,11 +586,25 @@ func (a *App) startExecution(mode fsops.OpMode) {
 					if p.TotalFiles > 0 {
 						progressBar.SetValue(float64(p.CurrentFileIndex) / float64(p.TotalFiles))
 					}
-					fileLabel.SetText(fmt.Sprintf("Memproses: %s (%d dari %d berkas)", p.CurrentFileName, p.CurrentFileIndex, p.TotalFiles))
-					byteLabel.SetText(fmt.Sprintf("%s / %s", FormatBytes(p.BytesProcessed), FormatBytes(p.TotalBytes)))
+					fileLabel.SetText(fmt.Sprintf(FmtProcessingFile, p.CurrentFileName, p.CurrentFileIndex, p.TotalFiles))
+					byteLabel.SetText(fmt.Sprintf(FmtByteProgress, FormatBytes(p.BytesProcessed), FormatBytes(p.TotalBytes)))
 				})
 			},
 		})
+
+		// Bug kritis hasil audit (R-C2/R-U6): kegagalan total (mis. folder tujuan tidak bisa dibuat)
+		// WAJIB dilaporkan apa adanya ke pengguna, bukan ditelan diam-diam lalu ditampilkan sebagai sukses.
+		if execErr != nil {
+			fyne.Do(func() {
+				a.isExecuting.Store(false)
+				progressDialog.Hide()
+				a.updateActionButtonsState()
+				dialog.ShowError(fmt.Errorf(FmtExecutionFailedMessage, mode, execErr), a.window)
+				a.triggerAsyncScan()
+				a.asyncGeneration.Add(1)
+			})
+			return
+		}
 
 		// Siapkan data laporan (R-P7)
 		var reportCollisions []report.CollisionItem
@@ -605,25 +637,33 @@ func (a *App) startExecution(mode fsops.OpMode) {
 			Cancelled:          execRes.Cancelled,
 		}
 
-		// Tulis berkas _laporan.txt di folder tujuan (R-P7)
-		reportPath, _ := report.WriteFile(destDir, reportData)
+		// Tulis berkas _laporan.txt di folder tujuan (R-P7). Kegagalan tulis tidak membatalkan hasil
+		// yang sudah diproses, tapi WAJIB dilaporkan eksplisit ke pengguna, bukan ditelan (R-C2).
+		reportPath, reportErr := report.WriteFile(destDir, reportData)
 		reportContent := report.Generate(reportData)
 
 		fyne.Do(func() {
-			a.isExecuting = false
+			a.isExecuting.Store(false)
 			progressDialog.Hide()
 			a.updateActionButtonsState()
+
+			if reportErr != nil {
+				dialog.ShowError(fmt.Errorf(FmtErrReportWriteFailed, reportErr), a.window)
+			}
 
 			// Tampilkan Ringkasan Hasil
 			a.showSummaryDialog(execRes, reportPath, reportContent)
 
 			// Pindai ulang folder untuk memperbarui status
 			a.triggerAsyncScan()
+			a.asyncGeneration.Add(1)
 		})
 	}()
 }
 
 // showSummaryDialog menampilkan modal ringkasan setelah eksekusi selesai.
+// reportPath boleh kosong bila penulisan _laporan.txt gagal (lihat pesan error terpisah yang
+// sudah ditampilkan oleh pemanggil) — ringkasan tetap jujur, tidak mengklaim path yang tidak ada.
 func (a *App) showSummaryDialog(res fsops.Result, reportPath, reportContent string) {
 	var statusMsg string
 	if res.Cancelled {
@@ -634,21 +674,28 @@ func (a *App) showSummaryDialog(res fsops.Result, reportPath, reportContent stri
 		statusMsg = SummarySuccessLabel
 	}
 
+	reportLine := MsgReportSaveFailed
+	if reportPath != "" {
+		reportLine = fmt.Sprintf(FmtReportSavedAt, reportPath)
+	}
+
 	detailText := fmt.Sprintf(
-		"%s\n\n- Berhasil: %d berkas (%s)\n- Gagal: %d berkas\n- Nama ganda diselesaikan: %d berkas\n\nLaporan disimpan di:\n%s",
+		FmtSummaryDetail,
 		statusMsg,
 		len(res.CopiedFiles),
 		FormatBytes(res.TotalBytesCopied),
 		len(res.FailedFiles),
 		len(res.CollisionRecords),
-		filepath.Join(res.DestDir, report.DefaultReportFileName),
+		reportLine,
 	)
 
 	label := widget.NewLabel(detailText)
 	label.Wrapping = fyne.TextWrapWord
 
 	btnOpenFolder := widget.NewButtonWithIcon(BtnOpenDestFolder, theme.FolderOpenIcon(), func() {
-		_ = OpenFolderInFileManager(res.DestDir)
+		if err := OpenFolderInFileManager(res.DestDir); err != nil {
+			dialog.ShowError(fmt.Errorf(FmtErrOpenFolderFailed, err), a.window)
+		}
 	})
 
 	btnViewReport := widget.NewButtonWithIcon(BtnViewReport, theme.DocumentIcon(), func() {

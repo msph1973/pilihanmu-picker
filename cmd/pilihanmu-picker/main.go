@@ -18,7 +18,7 @@ func main() {
 	w.SetMaster()
 
 	// Inisialisasi antarmuka pengguna
-	_ = ui.NewApp(w)
+	ui.NewApp(w)
 
 	// Jalankan event loop aplikasi
 	w.ShowAndRun()

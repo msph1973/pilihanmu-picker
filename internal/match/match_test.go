@@ -156,9 +156,6 @@ func TestJPEGOnlyWarning(t *testing.T) {
 		if !res.JPEGOnlyWarning {
 			t.Error("expected JPEGOnlyWarning = true when only JPEG matches")
 		}
-		if res.JPEGOnlyMessage != JPEGOnlyWarningMessage {
-			t.Errorf("expected standard warning message, got %q", res.JPEGOnlyMessage)
-		}
 		if len(res.Matched) != 0 {
 			t.Errorf("expected 0 matched RAW files")
 		}

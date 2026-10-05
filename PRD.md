@@ -1,7 +1,9 @@
 # PRD — Pilihanmu Picker (standalone)
 
-> **Status**: DRAF SPESIFIKASI — belum ada satu baris kode pun.
-> **Tanggal**: 24 September 2026
+> **Status**: DISETUJUI — implementasi inti (parser, pemindaian, pencocokan,
+> salin/pindah, laporan, GUI) sudah ada dan teruji; lihat `AGENTS.md` §3 untuk
+> rincian status per komponen.
+> **Tanggal spesifikasi dikunci**: 24 September 2026
 > **Pemilik**: msph1973
 > **Repo induk (tidak boleh diimpor)**: `msph1973/pilih`
 

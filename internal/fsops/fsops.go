@@ -133,6 +133,29 @@ func ValidateWindowsFileName(name string) error {
 	return nil
 }
 
+// ListDestFileNames membaca nama-nama berkas (bukan sub-direktori) yang sudah ada di folder tujuan,
+// untuk keperluan pratinjau pencocokan di lapisan UI (R-A6: satu-satunya pintu I/O berkas).
+// Mengembalikan slice kosong tanpa error bila folder tujuan belum ada (folder baru dibuat saat eksekusi).
+func ListDestFileNames(destDir string) ([]string, error) {
+	if destDir == "" {
+		return nil, nil
+	}
+	entries, err := os.ReadDir(NormalizePath(destDir))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read destination directory %q: %w", destDir, err)
+	}
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		if !e.IsDir() {
+			names = append(names, e.Name())
+		}
+	}
+	return names, nil
+}
+
 // Execute menjalankan proses penyalinan atau pemindahan berkas ke folder tujuan (PRD §4.6).
 func Execute(ctx context.Context, opts Options) (Result, error) {
 	if opts.SourceDir == "" || opts.DestDir == "" {
@@ -215,6 +238,16 @@ func Execute(ctx context.Context, opts Options) (Result, error) {
 		}
 	}
 
+	// resolvedParents melacak nama asli & nama hasil resolusi tabrakan dari tiap RAW induk
+	// (kunci: RelPath milik FileEntry RAW), agar sidecar .xmp pasangannya ikut mewarisi akhiran
+	// tabrakan yang sama persis dengan RAW induknya (PRD §4.6 E-5, K-10) alih-alih diberi
+	// penomoran independen yang bisa berbeda dari RAW-nya.
+	type parentResolution struct {
+		originalName string
+		resolvedName string
+	}
+	resolvedParents := make(map[string]parentResolution)
+
 	// Buffer streaming (64 KB)
 	buf := make([]byte, 64*1024)
 
@@ -249,9 +282,38 @@ func Execute(ctx context.Context, opts Options) (Result, error) {
 			continue
 		}
 
-		// Tentukan nama tujuan bebas tabrakan (R-P5, E-4)
-		destFileName, hadCollision := getUniqueDestinationName(cleanDest, f.FileName, destNamesMap)
+		// Nama kandidat yang akan dicek tabrakannya. Untuk sidecar .xmp, coba warisi akhiran
+		// tabrakan dari RAW induknya lebih dulu (lihat resolvedParents) supaya basename pasangan
+		// RAW+XMP tetap sama persis di folder tujuan (PRD §4.6 E-5, K-10).
+		candidateName := f.FileName
+		if unit.isSidecar {
+			if parent, found := resolvedParents[unit.parentRAWRel]; found {
+				parentExt := filepath.Ext(parent.originalName)
+				parentBase := strings.TrimSuffix(parent.originalName, parentExt)
+				resolvedParentBase := strings.TrimSuffix(parent.resolvedName, parentExt)
+				suffix := strings.TrimPrefix(resolvedParentBase, parentBase)
+				// Sidecar selalu berawalan basename RAW induknya, baik pola "DSC_0001.xmp"
+				// maupun "DSC_0001.CR3.xmp" (lihat internal/scan). Sisipkan sufiks tabrakan
+				// tepat setelah prefiks tsb supaya kedua pola tertangani secara seragam.
+				if suffix != "" && strings.HasPrefix(f.FileName, parentBase) {
+					candidateName = parentBase + suffix + strings.TrimPrefix(f.FileName, parentBase)
+				}
+			}
+		}
+
+		// Tentukan nama tujuan bebas tabrakan (R-P5, E-4). Untuk sidecar, nama kandidat turunan
+		// di atas tetap melalui pengecekan ini sebagai pengaman akhir terhadap R-P5 — bila nama
+		// turunan itu sendiri kebetulan sudah dipakai berkas lain yang tak terkait, penomoran
+		// independen (fallback lama) akan dipakai.
+		destFileName, hadCollision := getUniqueDestinationName(cleanDest, candidateName, destNamesMap)
 		destFilePath := filepath.Join(cleanDest, destFileName)
+
+		if !unit.isSidecar {
+			resolvedParents[f.RelPath] = parentResolution{
+				originalName: f.FileName,
+				resolvedName: destFileName,
+			}
+		}
 
 		// Lakukan operasi salin streaming dengan mekanisme retry jika terkunci (E-1, E-8, R-D4)
 		copyErr := copyWithRetry(ctx, f.Path, destFilePath, f.Size, retryDelays, buf)
@@ -335,9 +397,23 @@ func Execute(ctx context.Context, opts Options) (Result, error) {
 	return res, nil
 }
 
+// maxCollisionSuffixAttempts adalah batas atas percobaan penomoran tabrakan nama berkas pada
+// getUniqueDestinationName. Tanpa batas ini, fungsi tsb bisa berputar TANPA BATAS bila os.Stat
+// pada tiap kandidat terus-menerus mengembalikan error SELAIN "tidak ditemukan" (mis. permission
+// denied di folder tujuan), karena kondisi errors.Is(err, os.ErrNotExist) tidak akan pernah
+// bernilai true. Nilai ini jauh melebihi skenario tabrakan nyata namun tetap mencegah hang.
+const maxCollisionSuffixAttempts = 10000
+
 // getUniqueDestinationName memeriksa apakah nama berkas sudah ada di folder tujuan,
 // dan jika ada menghasilkan "nama (2).EXT", "nama (3).EXT", dst (E-4, R-P5).
 func getUniqueDestinationName(destDir string, fileName string, trackedNames map[string]struct{}) (string, bool) {
+	return getUniqueDestinationNameLimited(destDir, fileName, trackedNames, maxCollisionSuffixAttempts)
+}
+
+// getUniqueDestinationNameLimited berisi logika inti getUniqueDestinationName dengan batas
+// percobaan (maxAttempts) yang bisa disuntik, supaya perilaku anti-hang bisa diuji tanpa harus
+// menunggu puluhan ribu percobaan sungguhan (lihat maxCollisionSuffixAttempts).
+func getUniqueDestinationNameLimited(destDir string, fileName string, trackedNames map[string]struct{}, maxAttempts int) (string, bool) {
 	lowerName := strings.ToLower(fileName)
 	if _, inMap := trackedNames[lowerName]; !inMap {
 		// Cek juga langsung di disk
@@ -351,8 +427,9 @@ func getUniqueDestinationName(destDir string, fileName string, trackedNames map[
 	base := strings.TrimSuffix(fileName, ext)
 
 	index := 2
-	for {
-		candidate := fmt.Sprintf("%s (%d)%s", base, index, ext)
+	var candidate string
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		candidate = fmt.Sprintf("%s (%d)%s", base, index, ext)
 		lowerCandidate := strings.ToLower(candidate)
 		if _, inMap := trackedNames[lowerCandidate]; !inMap {
 			targetPath := filepath.Join(destDir, candidate)
@@ -362,6 +439,13 @@ func getUniqueDestinationName(destDir string, fileName string, trackedNames map[
 		}
 		index++
 	}
+
+	// Batas maxAttempts terlampaui: kemungkinan besar os.Stat terus gagal karena alasan selain
+	// "tidak ditemukan" (mis. permission denied), bukan karena benar-benar ada puluhan ribu
+	// berkas bertabrakan. Kembalikan kandidat SAAT ITU sebagai hasil best-effort supaya proses
+	// tidak berputar tanpa batas (cegah hang) — pemanggil tetap melalui verifikasi ukuran &
+	// jalur kegagalan normal seperti biasa bila nama ini ternyata tidak valid.
+	return candidate, true
 }
 
 // copyWithRetry melakukan penyalinan streaming dengan perulangan coba ulang jika berkas terkunci (E-8, R-D4, R-A5).
@@ -410,7 +494,11 @@ func copyFileStreaming(ctx context.Context, srcPath string, destPath string, buf
 	}
 	defer src.Close()
 
-	dest, err := os.OpenFile(NormalizePath(destPath), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	// O_EXCL menambah lapisan pengaman atomik terhadap race TOCTOU antara pengecekan os.Stat di
+	// getUniqueDestinationName dan penulisan aktual di sini (R-P5 tidak boleh dilanggar). Bila
+	// target sudah ada saat open (race sungguhan), OpenFile gagal dan mengalir ke jalur kegagalan
+	// normal (copyWithRetry -> FailureRecord) seperti error lainnya.
+	dest, err := os.OpenFile(NormalizePath(destPath), os.O_CREATE|os.O_WRONLY|os.O_TRUNC|os.O_EXCL, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
 	}

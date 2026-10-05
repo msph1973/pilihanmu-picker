@@ -8,11 +8,6 @@ import (
 	"github.com/msph1973/pilihanmu-picker/internal/scan"
 )
 
-const (
-	// JPEGOnlyWarningMessage adalah pesan peringatan standar jaring pengaman JPEG (PRD §4.4, R-U4).
-	JPEGOnlyWarningMessage = "Sepertinya Anda memotret JPEG saja. Matikan saringan RAW untuk memasukkan file JPEG."
-)
-
 // MatchItem merepresentasikan satu nama target dan berkas sumber yang cocok.
 type MatchItem struct {
 	// TargetName adalah nama dasar target dari daftar seleksi klien.
@@ -68,10 +63,9 @@ type Result struct {
 	TotalMatchedSize int64
 
 	// JPEGOnlyWarning bernilai true jika 0 berkas RAW cocok tetapi ditemukan berkas non-RAW yang cocok (R-U4).
+	// Teks pesan yang ditampilkan ke pengguna adalah tanggung jawab lapisan ui (lihat WarnJPEGOnly di
+	// internal/ui/strings.go) agar seluruh teks antarmuka tetap terpusat di satu tempat (R-C5).
 	JPEGOnlyWarning bool
-
-	// JPEGOnlyMessage berisi pesan teks peringatan jika JPEGOnlyWarning aktif.
-	JPEGOnlyMessage string
 }
 
 // Match mencocokkan daftar target dengan hasil pemindaian berkas sumber.
@@ -191,7 +185,6 @@ func Match(targetNames []string, scannedFiles []scan.FileEntry, opts Options) Re
 	// R-U4: Jaring pengaman JPEG
 	if len(res.Matched) == 0 && opts.RawFilter && potentialNonRAWMatches > 0 {
 		res.JPEGOnlyWarning = true
-		res.JPEGOnlyMessage = JPEGOnlyWarningMessage
 	}
 
 	return res

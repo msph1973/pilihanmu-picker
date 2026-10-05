@@ -38,29 +38,45 @@ pilihanmu-picker/
   PRD.md              # product requirements (ID) — sumber kebenaran fitur
   RULES.md            # aturan produk/arsitektur/kode — pelanggaran = gagal review
   AGENTS.md           # berkas ini
-  go.mod              # [BELUM ADA]
-  cmd/pilihanmu-picker/main.go   # [BELUM ADA] titik masuk
+  go.mod              # module github.com/msph1973/pilihanmu-picker — terimplementasi
+  cmd/pilihanmu-picker/main.go   # titik masuk — terimplementasi
   internal/
-    list/             # [BELUM ADA] parser daftar .txt (PRD §4.2)
-    scan/             # [BELUM ADA] pemindaian folder sumber (PRD §4.3)
-    match/            # [BELUM ADA] pencocokan + empat keranjang (PRD §4.3)
-    fsops/            # [BELUM ADA] salin/pindah/verifikasi — SATU-SATUNYA tempat I/O (R-A6)
-    report/           # [BELUM ADA] penulis _laporan.txt (PRD §4.7)
-    ui/               # [BELUM ADA] lapisan Fyne — satu-satunya tempat impor Fyne
-  .github/workflows/ci.yml       # [BELUM ADA] gerbang ubuntu + windows
-  .gitignore          # [BELUM ADA]
+    list/             # parser daftar .txt (PRD §4.2) — terimplementasi, cakupan tes lihat §8
+    scan/             # pemindaian folder sumber (PRD §4.3) — terimplementasi, cakupan tes lihat §8
+    match/            # pencocokan + empat keranjang (PRD §4.3) — terimplementasi, cakupan tes lihat §8
+    fsops/            # salin/pindah/verifikasi — SATU-SATUNYA tempat I/O (R-A6) — terimplementasi, cakupan tes lihat §8
+    report/           # penulis _laporan.txt (PRD §4.7) — terimplementasi, cakupan tes lihat §8
+    ui/               # lapisan Fyne — satu-satunya tempat impor Fyne — terimplementasi, cakupan tes lihat §8
+  .github/workflows/ci.yml       # gerbang ubuntu + windows — pipeline CI #1 (GitHub Actions)
+  .circleci/config.yml           # gerbang linux + windows — pipeline CI #2 (CircleCI), paralel dengan GitHub Actions
+  .circleci/info.yml             # metadata integrasi proyek CircleCI (id organisasi & proyek)
+  .gitignore          # terimplementasi — abaikan binary, .exe, AppImage, *.test, berkas besar
 ```
 
 `internal/` **tidak boleh** mengimpor `internal/ui` maupun Fyne (R-A2).
 
+Proyek ini punya **dua pipeline CI paralel yang sengaja dipertahankan keduanya**:
+GitHub Actions (`.github/workflows/ci.yml`, dipicu push/PR ke `main`) dan CircleCI
+(`.circleci/config.yml`, terhubung lewat integrasi proyek CircleCI — lihat
+`.circleci/info.yml`). Keduanya menjalankan gerbang kualitas yang sama (`gofmt`,
+`go vet`, `go test`, `go build`) pada matriks Linux + Windows; jangan hapus salah
+satunya tanpa keputusan eksplisit pemilik.
+
 ## 3. Status saat ini
 
-**Docs-only.** Belum ada satu baris kode Go, `go.mod`, CI, atau GUI.
+**Implementasi inti sudah ada dan berfungsi.** `go.mod`, `.gitignore`, keenam
+paket `internal/*` (`list`, `scan`, `match`, `fsops`, `report`, `ui`) beserta
+tesnya, dan `cmd/pilihanmu-picker/main.go` sudah ada. Kedua pipeline CI — GitHub
+Actions (`.github/workflows/ci.yml`) dan CircleCI (`.circleci/config.yml`) —
+sudah ada dan menjalankan gerbang kualitas (gofmt, go vet, go test, go build) di
+matriks Linux + Windows.
 
 **BELUM ADA — jangan klaim ada:**
 
-`go.mod` · seluruh kode Go · GUI · tes · CI · `.gitignore` · binary `.exe` ·
-AppImage · ikon · berkas konfigurasi · README · rilis GitHub · mode API/token
+Ikon aplikasi · binary `.exe` rilis resmi / artefak rilis GitHub publik ·
+AppImage Linux · `README.md` terpisah (catatan: `AGENTS.md`/`PRD.md`/`RULES.md`
+ada, `README.md` tidak) · berkas konfigurasi pengguna (mis. mengingat folder
+terakhir — masih pertanyaan terbuka di PRD §10) · mode API/token
 
 ## 4. Prasyarat lingkungan
 

@@ -11,9 +11,16 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+
+	"github.com/msph1973/pilihanmu-picker/internal/match"
 )
 
 // BasketCard adalah widget kustom untuk menampilkan satu dari empat keranjang hasil pratinjau.
+//
+// PENTING: field publik (Title, CountText, SubText, ActionBtn, AccentColor) hanya dibaca saat
+// NewBasketCard menginisialisasi tampilan. Mengubah field ini secara langsung SETELAH widget
+// dibuat TIDAK akan merender ulang label/warnanya — gunakan SetValues untuk memperbarui
+// CountText dan SubText secara aman.
 type BasketCard struct {
 	widget.BaseWidget
 	Title       string
@@ -90,7 +97,7 @@ func (bc *BasketCard) CreateRenderer() fyne.WidgetRenderer {
 // ShowNotFoundNamesDialog menampilkan dialog daftar nama berkas yang tidak ditemukan.
 func ShowNotFoundNamesDialog(parent fyne.Window, notFound []string) {
 	if len(notFound) == 0 {
-		dialog.ShowInformation("Tidak Ditemukan", "Semua nama dalam daftar berhasil ditemukan di folder sumber!", parent)
+		dialog.ShowInformation(DialogNotFoundEmptyTitle, MsgAllNamesFound, parent)
 		return
 	}
 
@@ -102,27 +109,69 @@ func ShowNotFoundNamesDialog(parent fyne.Window, notFound []string) {
 
 	entry.SetMinRowsVisible(8)
 
-	copyBtn := widget.NewButtonWithIcon("Salin ke Clipboard", theme.ContentCopyIcon(), func() {
+	copyBtn := widget.NewButtonWithIcon(BtnCopyToClipboard, theme.ContentCopyIcon(), func() {
 		parent.Clipboard().SetContent(content)
-		dialog.ShowInformation("Berhasil Disalin", fmt.Sprintf("%d nama berhasil disalin ke clipboard.", len(notFound)), parent)
+		dialog.ShowInformation(DialogCopiedTitle, fmt.Sprintf(FmtCopiedNamesToClipboard, len(notFound)), parent)
 	})
 
 	scroll := container.NewScroll(entry)
 
 	body := container.NewBorder(
-		widget.NewLabel(fmt.Sprintf("Ditemukan %d nama dari daftar yang tidak ada di folder sumber:", len(notFound))),
+		widget.NewLabel(fmt.Sprintf(FmtNotFoundHeader, len(notFound))),
 		copyBtn,
 		nil,
 		nil,
 		scroll,
 	)
 
-	d := dialog.NewCustom("Daftar Tidak Ditemukan", "Tutup", body, parent)
+	d := dialog.NewCustom(DialogNotFoundListTitle, BtnClose, body, parent)
+	d.Resize(fyne.NewSize(480, 400))
+	d.Show()
+}
+
+// ShowCollisionsDialog menampilkan dialog daftar pasangan path sumber yang mengalami tabrakan
+// nama, beserta nama berkas hasil resolusi otomatisnya (R-U2, PRD §4.5).
+func ShowCollisionsDialog(parent fyne.Window, collisions []match.Collision) {
+	if len(collisions) == 0 {
+		dialog.ShowInformation(DialogNoCollisionsTitle, MsgNoCollisions, parent)
+		return
+	}
+
+	lines := make([]string, 0, len(collisions))
+	for _, c := range collisions {
+		lines = append(lines, fmt.Sprintf(FmtCollisionLine, c.RelPath, c.ResolvedFileName))
+	}
+	content := strings.Join(lines, "\n")
+
+	entry := widget.NewMultiLineEntry()
+	entry.SetText(content)
+	entry.Wrapping = fyne.TextWrapWord
+	entry.Disable()
+	entry.SetMinRowsVisible(8)
+
+	copyBtn := widget.NewButtonWithIcon(BtnCopyToClipboard, theme.ContentCopyIcon(), func() {
+		parent.Clipboard().SetContent(content)
+		dialog.ShowInformation(DialogCopiedTitle, fmt.Sprintf(FmtCopiedCollisionsToClipboard, len(collisions)), parent)
+	})
+
+	scroll := container.NewScroll(entry)
+
+	body := container.NewBorder(
+		widget.NewLabel(fmt.Sprintf(FmtCollisionHeader, len(collisions))),
+		copyBtn,
+		nil,
+		nil,
+		scroll,
+	)
+
+	d := dialog.NewCustom(DialogCollisionListTitle, BtnClose, body, parent)
 	d.Resize(fyne.NewSize(480, 400))
 	d.Show()
 }
 
 // ShowReportViewerDialog menampilkan dialog pratinjau isi _laporan.txt.
+// reportPath boleh kosong bila penulisan berkas laporan ke disk gagal — isi laporan tetap
+// ditampilkan dari memori, dengan keterangan yang jelas bahwa berkas tidak tersimpan (R-C2, R-U6).
 func ShowReportViewerDialog(parent fyne.Window, reportText string, reportPath string) {
 	entry := widget.NewMultiLineEntry()
 	entry.SetText(reportText)
@@ -130,22 +179,27 @@ func ShowReportViewerDialog(parent fyne.Window, reportText string, reportPath st
 	entry.Disable()
 	entry.SetMinRowsVisible(12)
 
-	copyBtn := widget.NewButtonWithIcon("Salin Isi Laporan", theme.ContentCopyIcon(), func() {
+	copyBtn := widget.NewButtonWithIcon(BtnCopyReportContent, theme.ContentCopyIcon(), func() {
 		parent.Clipboard().SetContent(reportText)
-		dialog.ShowInformation("Berhasil Disalin", "Isi laporan berhasil disalin ke clipboard.", parent)
+		dialog.ShowInformation(DialogCopiedTitle, MsgReportCopied, parent)
 	})
 
 	scroll := container.NewScroll(entry)
 
+	pathLabel := fmt.Sprintf(FmtReportFileLabel, reportPath)
+	if reportPath == "" {
+		pathLabel = MsgReportNotSavedToDisk
+	}
+
 	body := container.NewBorder(
-		widget.NewLabel(fmt.Sprintf("Berkas laporan: %s", reportPath)),
+		widget.NewLabel(pathLabel),
 		copyBtn,
 		nil,
 		nil,
 		scroll,
 	)
 
-	d := dialog.NewCustom("Laporan Hasil Seleksi (_laporan.txt)", "Tutup", body, parent)
+	d := dialog.NewCustom(DialogReportViewerTitle, BtnClose, body, parent)
 	d.Resize(fyne.NewSize(580, 480))
 	d.Show()
 }
