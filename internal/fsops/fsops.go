@@ -407,18 +407,22 @@ const maxCollisionSuffixAttempts = 10000
 // getUniqueDestinationName memeriksa apakah nama berkas sudah ada di folder tujuan,
 // dan jika ada menghasilkan "nama (2).EXT", "nama (3).EXT", dst (E-4, R-P5).
 func getUniqueDestinationName(destDir string, fileName string, trackedNames map[string]struct{}) (string, bool) {
-	return getUniqueDestinationNameLimited(destDir, fileName, trackedNames, maxCollisionSuffixAttempts)
+	return getUniqueDestinationNameLimited(destDir, fileName, trackedNames, maxCollisionSuffixAttempts, os.Stat)
 }
 
 // getUniqueDestinationNameLimited berisi logika inti getUniqueDestinationName dengan batas
-// percobaan (maxAttempts) yang bisa disuntik, supaya perilaku anti-hang bisa diuji tanpa harus
-// menunggu puluhan ribu percobaan sungguhan (lihat maxCollisionSuffixAttempts).
-func getUniqueDestinationNameLimited(destDir string, fileName string, trackedNames map[string]struct{}, maxAttempts int) (string, bool) {
+// percobaan (maxAttempts) dan fungsi pemeriksa keberadaan berkas (stat) yang keduanya bisa
+// disuntik. maxAttempts disuntik supaya perilaku anti-hang bisa diuji tanpa harus menunggu
+// puluhan ribu percobaan sungguhan (lihat maxCollisionSuffixAttempts). stat disuntik supaya
+// skenario "stat terus gagal karena alasan selain tidak-ditemukan" bisa diuji deterministik
+// di SEMUA OS — memicunya lewat izin berkas tidak portabel, karena di Windows os.Chmod hanya
+// menyetel atribut read-only dan tidak menolak akses baca seperti di Unix.
+func getUniqueDestinationNameLimited(destDir string, fileName string, trackedNames map[string]struct{}, maxAttempts int, stat func(string) (os.FileInfo, error)) (string, bool) {
 	lowerName := strings.ToLower(fileName)
 	if _, inMap := trackedNames[lowerName]; !inMap {
 		// Cek juga langsung di disk
 		targetPath := filepath.Join(destDir, fileName)
-		if _, err := os.Stat(targetPath); errors.Is(err, os.ErrNotExist) {
+		if _, err := stat(targetPath); errors.Is(err, os.ErrNotExist) {
 			return fileName, false
 		}
 	}
@@ -433,7 +437,7 @@ func getUniqueDestinationNameLimited(destDir string, fileName string, trackedNam
 		lowerCandidate := strings.ToLower(candidate)
 		if _, inMap := trackedNames[lowerCandidate]; !inMap {
 			targetPath := filepath.Join(destDir, candidate)
-			if _, err := os.Stat(targetPath); errors.Is(err, os.ErrNotExist) {
+			if _, err := stat(targetPath); errors.Is(err, os.ErrNotExist) {
 				return candidate, true
 			}
 		}

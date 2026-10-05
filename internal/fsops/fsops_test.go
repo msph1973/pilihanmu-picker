@@ -2,6 +2,7 @@ package fsops
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -739,24 +740,21 @@ func TestNonASCIIFilenameEndToEnd(t *testing.T) {
 }
 
 // TestGetUniqueDestinationNameAttemptLimit memverifikasi getUniqueDestinationName tidak berputar
-// tanpa batas bila os.Stat terus-menerus gagal karena alasan SELAIN "tidak ditemukan" (mis.
-// permission denied). Folder tujuan di-chmod 000 sehingga setiap os.Stat pada path di dalamnya
-// gagal dengan permission denied, bukan ErrNotExist, memaksa loop mencapai batas maxAttempts.
+// tanpa batas bila stat terus-menerus gagal karena alasan SELAIN "tidak ditemukan" (mis.
+// permission denied), lalu jatuh ke kandidat best-effort setelah batas percobaan tercapai.
+//
+// Kegagalan stat DISUNTIK, bukan dipicu lewat izin berkas: os.Chmod(0o000) menolak akses baca
+// di Unix tetapi TIDAK di Windows (hanya menyetel atribut read-only), sehingga pemicu lama gagal
+// di CI windows-latest. Dengan suntikan ini perilakunya identik di semua OS.
 func TestGetUniqueDestinationNameAttemptLimit(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("skip: berjalan sebagai root, permission bits tidak berlaku")
-	}
-
-	destDir := t.TempDir()
-	if err := os.Chmod(destDir, 0o000); err != nil {
-		t.Fatalf("failed to chmod destDir: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = os.Chmod(destDir, 0o755)
-	})
-
 	const limit = 5
-	candidate, hadCollision := getUniqueDestinationNameLimited(destDir, "test.txt", map[string]struct{}{}, limit)
+
+	statSelaluGagal := func(string) (os.FileInfo, error) {
+		return nil, errors.New("permission denied")
+	}
+
+	candidate, hadCollision := getUniqueDestinationNameLimited(
+		"/folder/tujuan", "test.txt", map[string]struct{}{}, limit, statSelaluGagal)
 
 	if !hadCollision {
 		t.Errorf("expected hadCollision=true when attempt limit is reached (anti-hang fallback)")
