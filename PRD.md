@@ -299,6 +299,9 @@ Sebuah rilis dianggap selesai bila seluruh butir berikut terbukti:
 - [ ] CI hijau di `ubuntu-latest` **dan** `windows-latest`
 - [ ] Tag `v*` menghasilkan GitHub Release berisi `.zip` Windows (ber-ikon),
       `.tar.gz` Linux, dan `SHA256SUMS`
+- [ ] Versi tag tertanam di **kedua** biner rilis (`.exe` Windows **dan** biner
+      Linux) dan tampil di judul jendela — bukan hanya di metadata berkas.
+      Rilis `v0.1.0` gagal butir ini di Windows (lihat AGENTS.md §7 jebakan 12)
 - [ ] Tidak ada satu pun panggilan jaringan di seluruh kode
 
 ## 10. Pertanyaan terbuka
