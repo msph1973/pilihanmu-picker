@@ -12,8 +12,58 @@ permissions:
   contents: write
 
 jobs:
+  # Gerbang sebelum apa pun dibangun: tag harus menunjuk commit yang sudah masuk
+  # main DAN lulus gerbang kualitas. Tanpa ini, `git push origin v1.0.0` pada
+  # commit yang belum teruji bisa langsung menerbitkan rilis.
+  verify:
+    name: Verify tagged commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Assert the tag points to a commit on main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/main; then
+            echo "Tag ${GITHUB_REF_NAME} menunjuk ke ${GITHUB_SHA}, yang BUKAN bagian dari main."
+            echo "Rilis hanya boleh dibuat dari commit yang sudah masuk main."
+            exit 1
+          fi
+          echo "OK: ${GITHUB_SHA} ada di main"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          check-latest: true
+          cache: true
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev libwayland-dev libxkbcommon-dev
+
+      - name: Quality gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          UNFORMATTED=$(gofmt -l .)
+          if [ -n "$UNFORMATTED" ]; then
+            echo "Berkas berikut belum diformat dengan gofmt:"
+            echo "$UNFORMATTED"
+            exit 1
+          fi
+          go vet ./...
+          go test -shuffle=on ./...
+
   windows:
     name: Windows (.exe)
+    needs: [ verify ]
     runs-on: windows-latest
     steps:
       - name: Checkout repository
@@ -42,8 +92,13 @@ jobs:
 
       - name: Build .exe with embedded icon and metadata
         shell: pwsh
+        # Tag dilewatkan lewat env, TIDAK disisipkan ke badan skrip: tag yang
+        # mengandung `$()` akan dieksekusi PowerShell sebagai perintah, dan
+        # workflow ini punya izin tulis repo.
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          $tag = "${{ github.ref_name }}"
+          $tag = $env:RELEASE_TAG
           $ver = $tag.TrimStart('v')
 
           # fyne package mengambil -ldflags dari GOFLAGS lalu menggabungkannya
@@ -71,8 +126,10 @@ jobs:
 
       - name: Assemble .zip and verify metadata
         shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          $ver = "${{ github.ref_name }}".TrimStart('v')
+          $ver = ($env:RELEASE_TAG).TrimStart('v')
 
           # fyne menamai .exe sesuai [Details] Name di FyneApp.toml, jadi cari
           # daripada menebak. Gagal keras kalau jumlahnya bukan satu.
@@ -107,6 +164,7 @@ jobs:
 
   linux:
     name: Linux (tar.gz)
+    needs: [ verify ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

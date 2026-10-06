@@ -83,6 +83,9 @@ git push origin v0.1.0
 
 `.github/workflows/release.yml` lalu:
 
+- **verifikasi dulu**: tag harus menunjuk commit yang sudah masuk `main`, dan
+  gerbang kualitas (`gofmt`, `go vet`, `go test`) harus lulus — supaya commit
+  yang belum teruji tidak bisa terbit sebagai rilis
 - `windows-latest` → `fyne package -os windows -release` → `Pilihanmu Picker.exe`
   (ikon + metadata tertanam) → `.zip`
 - `ubuntu-latest` → `go build` → `.tar.gz`
