@@ -22,6 +22,10 @@ dist/
 *.ico
 *.manifest
 
+# Versi rilis: ditulis .github/workflows/release.yml sebelum `fyne package`.
+# Pada build pengembangan berkas ini tidak ada (nilai default di main.go = "dev").
+cmd/pilihanmu-picker/version_gen.go
+
 # Archives and large files
 *.zip
 *.tar.gz
