@@ -39,7 +39,12 @@ pilihanmu-picker/
   RULES.md            # aturan produk/arsitektur/kode — pelanggaran = gagal review
   AGENTS.md           # berkas ini
   go.mod              # module github.com/msph1973/pilihanmu-picker — terimplementasi
-  cmd/pilihanmu-picker/main.go   # titik masuk — terimplementasi
+  README.md           # pengantar, cara pakai, build, dan rilis
+  LICENSE             # proprieter — semua hak dilindungi
+  cmd/pilihanmu-picker/
+    main.go           # titik masuk — terimplementasi (menyuntik `version` lewat ldflags)
+    FyneApp.toml      # metadata paket Fyne (nama, ID, versi, ikon) — WAJIB di sini, bukan di akar repo
+    Icon.png          # ikon aplikasi — monogram Pilihanmu
   internal/
     list/             # parser daftar .txt (PRD §4.2) — terimplementasi, cakupan tes lihat §8
     scan/             # pemindaian folder sumber (PRD §4.3) — terimplementasi, cakupan tes lihat §8
@@ -48,6 +53,7 @@ pilihanmu-picker/
     report/           # penulis _laporan.txt (PRD §4.7) — terimplementasi, cakupan tes lihat §8
     ui/               # lapisan Fyne — satu-satunya tempat impor Fyne — terimplementasi, cakupan tes lihat §8
   .github/workflows/ci.yml       # gerbang ubuntu + windows — pipeline CI #1 (GitHub Actions)
+  .github/workflows/release.yml  # rilis: tag v* → .zip Windows (ber-ikon) + .tar.gz Linux + SHA256SUMS
   .circleci/config.yml           # gerbang linux + windows — pipeline CI #2 (CircleCI), paralel dengan GitHub Actions
   .circleci/info.yml             # metadata integrasi proyek CircleCI (id organisasi & proyek)
   .gitignore          # terimplementasi — abaikan binary, .exe, AppImage, *.test, berkas besar
@@ -73,10 +79,10 @@ matriks Linux + Windows.
 
 **BELUM ADA — jangan klaim ada:**
 
-Ikon aplikasi · binary `.exe` rilis resmi / artefak rilis GitHub publik ·
-AppImage Linux · `README.md` terpisah (catatan: `AGENTS.md`/`PRD.md`/`RULES.md`
-ada, `README.md` tidak) · berkas konfigurasi pengguna (mis. mengingat folder
-terakhir — masih pertanyaan terbuka di PRD §10) · mode API/token
+Artefak rilis yang sudah terbit (belum ada tag `v*` yang didorong, jadi
+`release.yml` belum pernah berjalan) · code-signing Windows — tanpa sertifikat,
+SmartScreen akan memperingatkan · berkas konfigurasi pengguna (mis. mengingat
+folder terakhir — masih pertanyaan terbuka di PRD §10) · mode API/token
 
 ## 4. Prasyarat lingkungan
 
@@ -115,9 +121,18 @@ go run ./cmd/pilihanmu-picker
 # Build binary Linux
 go build -o pilihanmu-picker ./cmd/pilihanmu-picker
 
-# Build .exe Windows — JANGAN pakai mingw (lihat §7)
-go run github.com/fyne-io/fyne-cross@latest windows -arch=amd64 ./cmd/pilihanmu-picker
-# ^ butuh Docker. Cara utama & paling andal tetap CI windows-latest (§6 fase 4).
+# Paket rilis Windows (butuh fyne CLI: go install fyne.io/tools/cmd/fyne@v1.7.3;
+# CI menyematkan versi itu agar rilis bisa diulang)
+cd cmd/pilihanmu-picker
+GOFLAGS="-ldflags=-X=main.version=v0.1.0" fyne package -os windows -release \
+  --app-id id.web.pilihanmu.picker --app-version 0.1.0 --app-build 1
+# → "Pilihanmu Picker.exe" ber-ikon + bermetadata. FyneApp.toml dan Icon.png
+#   dibaca dari direktori ini (lihat §7 jebakan 10).
+# Perhatikan `-X=` TANPA spasi — lihat §7 jebakan 12.
+# Alternatif tanpa Docker: fyne-cross, tapi CI windows-latest tetap cara utama (K-12).
+
+# Rilis resmi = dorong tag, bukan build lokal
+git tag v0.1.0 && git push origin v0.1.0    # → .github/workflows/release.yml
 ```
 
 ## 6. Rencana implementasi
@@ -151,10 +166,15 @@ Ini bagian yang paling menentukan. Semua harus teruji sebelum GUI disentuh.
 - Dua tombol tanpa default: **Salin** / **Pindahkan** (K-4), keduanya berkonfirmasi
 - Progres + tombol batal (R-U3)
 
-### Fase 4 — Paket & rilis
-- CI mengunggah `.exe` dari `windows-latest` sebagai artefak rilis
-- AppImage Linux
-- Verifikasi seluruh kriteria selesai di PRD §9
+### Fase 4 — Paket & rilis — SELESAI (2026-10-06)
+- `cmd/pilihanmu-picker/FyneApp.toml` + `Icon.png` (monogram Pilihanmu) →
+  `.exe` ber-ikon dan bermetadata
+- `.github/workflows/release.yml`: tag `v*` → `.zip` Windows + `.tar.gz` Linux
+  + `SHA256SUMS` + GitHub Release
+- **AppImage Linux diganti `.tar.gz`** (keputusan pemilik 2026-10-06; PRD §5
+  sudah diperbarui)
+- Menjalankan seluruh kriteria selesai PRD §9 tetap tugas **per rilis**, bukan
+  sekali saja
 
 **Jangan lompat ke Fase 3 sebelum Fase 2 lulus di CI Windows.**
 
@@ -189,9 +209,31 @@ Ini bagian yang paling menentukan. Semua harus teruji sebelum GUI disentuh.
    membahas web/API/billing repo induk. Memuatnya di repo ini hanya membawa
    konteks yang salah.
 
-9. **Jangan membuka ulang keputusan K-1..K-12** (PRD §7) tanpa persetujuan
+9. **Jangan membuka ulang keputusan K-1..K-13** (PRD §7) tanpa persetujuan
    pemilik. Terutama K-1 (offline): permintaan "tambahkan login" berarti PRD
    harus diubah lebih dulu, bukan langsung dikerjakan.
+
+10. **`FyneApp.toml` dan `Icon.png` harus di direktori paket main**
+    (`cmd/pilihanmu-picker/`), bukan di akar repo. `fyne package --src <dir>`
+    memuat metadata DARI `<dir>` itu, menulis `fyne.syso` ke sana, lalu
+    menjalankan `go build` di sana. Di akar repo, ikon dan metadata tidak akan
+    ikut tertanam — dan tanpa `Icon.png` perintahnya langsung gagal
+    ("Missing application icon").
+
+11. **`fyne package` MENULIS ULANG `FyneApp.toml`.** Setelah packaging, berkas itu
+    ditulis kembali dari struct hasil parse: `Build` naik satu, dan **seluruh
+    komentar hilang**. Jadi jangan menaruh penjelasan penting sebagai komentar di
+    sana — taruh di berkas ini. Di CI berkasnya jadi kotor setelah build; jangan
+    commit hasil tulis-ulang itu.
+
+12. **Penyuntikan versi lewat `GOFLAGS` harus memakai `-X=` tanpa spasi.**
+    Fyne mengambil `-ldflags` dari `GOFLAGS` dengan `strings.Fields`, yang
+    **memecah pada spasi**. Bentuk lazim `-ldflags=-X main.version=v1` terbaca
+    sebagai dua token (`-ldflags=-X` + `main.version=v1`) → `go` gagal dengan
+    `parsing $GOFLAGS: non-flag "main.version=v1"`. Pakai
+    `-ldflags=-X=main.version=v1` (linker menerima bentuk `-X=`).
+    Pada `go build` biasa kedua bentuk sama-sama jalan — jebakan ini khusus
+    jalur Fyne.
 
 ## 8. Definisi selesai
 

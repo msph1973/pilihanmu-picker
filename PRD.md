@@ -210,7 +210,7 @@ Gagal
 | Aspek | Ketentuan |
 |---|---|
 | **Platform** | Windows 10+ (utama). Linux x86_64 (sekunder). macOS **di luar cakupan**. |
-| **Distribusi** | Windows: `.exe` portabel + `.zip`, **tanpa installer, tanpa hak admin**. Linux: AppImage. |
+| **Distribusi** | Windows: `.exe` portabel + `.zip`, **tanpa installer, tanpa hak admin**. Linux: binary + `.tar.gz`. |
 | **Jaringan** | **Nol.** Aplikasi tidak boleh melakukan satu pun panggilan jaringan. Tidak ada telemetri, tidak ada pemeriksaan pembaruan otomatis. Ini properti keamanan, bukan kebetulan. |
 | **Ukuran** | Satu binary, target < 40 MB. |
 | **Memori** | Tidak pernah memuat isi file RAW ke memori. |
@@ -247,8 +247,8 @@ Karakteristik yang **dibekukan** — app ini bergantung padanya:
 
 ## 7. Keputusan yang dikunci
 
-Semua keputusan berikut diambil 24 September 2026 dan **tidak boleh dibuka ulang
-tanpa persetujuan pemilik**.
+Semua keputusan berikut diambil 24 September 2026 — kecuali yang bertanggal lain —
+dan **tidak boleh dibuka ulang tanpa persetujuan pemilik**.
 
 | # | Keputusan | Alasan |
 |---|---|---|
@@ -264,6 +264,7 @@ tanpa persetujuan pemilik**.
 | K-10 | `.xmp` pendamping ikut tersalin | Banyak fotografer sudah menerapkan sidecar di folder sumber. |
 | K-11 | Stack: **Go + Fyne** | Satu binary, nol dependensi OS untuk pengguna, pemilih folder bawaan. Tampilan identik saat dikembangkan di Linux. |
 | K-12 | Windows-first; `.exe` dibangun di CI `windows-latest` + `fyne-cross` lokal | Pengembang hanya punya Linux — CI adalah satu-satunya cara menguji di Windows asli. |
+| K-13 | Nama tampilan **"Pilihanmu Picker"**, ikon = **monogram Pilihanmu** (`cmd/pilihanmu-picker/Icon.png`) | Diputuskan 2026-10-06: binary rilis harus punya identitas visual yang sama dengan web, tanpa desain baru. |
 
 ## 8. Di luar cakupan
 
@@ -296,6 +297,8 @@ Sebuah rilis dianggap selesai bila seluruh butir berikut terbukti:
 - [ ] Nama non-ASCII (`Café_0001.CR3`) cocok dan tersalin
 - [ ] Peringatan §4.4 muncul untuk folder JPEG-only
 - [ ] CI hijau di `ubuntu-latest` **dan** `windows-latest`
+- [ ] Tag `v*` menghasilkan GitHub Release berisi `.zip` Windows (ber-ikon),
+      `.tar.gz` Linux, dan `SHA256SUMS`
 - [ ] Tidak ada satu pun panggilan jaringan di seluruh kode
 
 ## 10. Pertanyaan terbuka
@@ -309,4 +312,3 @@ Belum diputuskan; **jangan** dikerjakan tanpa keputusan eksplisit:
    ada (K-10). Menghasilkan `.xmp` baru adalah fitur lain.
 3. **Nama berkas laporan** — `_laporan.txt` dipilih agar mudah ditemukan; belum
    ada keputusan final.
-4. **Ikon dan nama tampilan aplikasi** — belum ditentukan.

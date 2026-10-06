@@ -1,0 +1,15 @@
+Website = "https://pilihanmu.web.id"
+Description = "Pemilah berkas RAW hasil seleksi klien menjadi folder baru. Sepenuhnya offline."
+
+[Details]
+Icon = "Icon.png"
+Name = "Pilihanmu Picker"
+ID = "id.web.pilihanmu.picker"
+Version = "0.1.0"
+Build = 1
+
+[LinuxAndBSD]
+GenericName = "RAW Photo Picker"
+Categories = ["Graphics", "Photography"]
+Comment = "Pindahkan berkas RAW yang dipilih klien ke folder baru"
+Keywords = ["raw", "fotografi", "seleksi", "pilihanmu"]
