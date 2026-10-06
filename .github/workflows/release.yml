@@ -1,0 +1,187 @@
+name: Release
+
+# Rilis dibuat dengan mendorong tag versi: `git push origin v0.1.0`.
+# Alur ini TIDAK berjalan pada push biasa ke main — gerbang kualitas harian
+# ada di ci.yml.
+on:
+  push:
+    tags: [ 'v*' ]
+
+# gh release create butuh izin tulis.
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows (.exe)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          check-latest: true
+          cache: true
+
+      - name: Ensure C toolchain (Windows)
+        shell: pwsh
+        run: |
+          if (-not (Get-Command gcc -ErrorAction SilentlyContinue)) {
+            choco install mingw -y
+          }
+          gcc --version
+
+      - name: Install Fyne CLI
+        # Disematkan, bukan @latest: perilaku v1.7.3 sudah diverifikasi
+        # (pemecahan GOFLAGS pada spasi, penulisan ulang FyneApp.toml), dan
+        # rilis harus bisa diulang. Naikkan versinya secara sadar.
+        run: go install fyne.io/tools/cmd/fyne@v1.7.3
+
+      - name: Build .exe with embedded icon and metadata
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $ver = $tag.TrimStart('v')
+
+          # fyne package mengambil -ldflags dari GOFLAGS lalu menggabungkannya
+          # dengan -H=windowsgui dan -s -w miliknya sendiri. Ini satu-satunya
+          # jalan menyuntik versi ke `var version` di main.go.
+          #
+          # WAJIB bentuk `-X=` (tanpa spasi): Fyne memecah GOFLAGS pada spasi,
+          # jadi `-X main.version=...` akan terbaca sebagai dua flag dan gagal
+          # dengan "non-flag main.version=...".
+          $env:GOFLAGS = "-ldflags=-X=main.version=$tag"
+
+          $fyne = Join-Path (go env GOPATH) "bin\fyne.exe"
+
+          # FyneApp.toml dan Icon.png dibaca dari direktori ini, dan fyne.syso
+          # ditulis ke sini juga — karena itu srcDir = direktori paket main.
+          Push-Location cmd/pilihanmu-picker
+          & $fyne package -os windows -release `
+            --app-id id.web.pilihanmu.picker `
+            --app-version $ver `
+            --app-build $env:GITHUB_RUN_NUMBER
+          $code = $LASTEXITCODE
+          Get-ChildItem
+          Pop-Location
+          if ($code -ne 0) { exit $code }
+
+      - name: Assemble .zip and verify metadata
+        shell: pwsh
+        run: |
+          $ver = "${{ github.ref_name }}".TrimStart('v')
+
+          # fyne menamai .exe sesuai [Details] Name di FyneApp.toml, jadi cari
+          # daripada menebak. Gagal keras kalau jumlahnya bukan satu.
+          $exes = @(Get-ChildItem "cmd/pilihanmu-picker/*.exe")
+          if ($exes.Count -ne 1) {
+            throw "diharapkan tepat 1 .exe di cmd/pilihanmu-picker, ditemukan $($exes.Count)"
+          }
+          $exe = $exes[0]
+
+          # Bukti metadata benar-benar tertanam: VersionInfo diisi goversioninfo
+          # dari --app-version/--app-build, dan ikon disematkan saat build.
+          $info = $exe.VersionInfo
+          Write-Host "FileVersion=$($info.FileVersion) ProductName=$($info.ProductName)"
+          if (-not $info.FileVersion.StartsWith("$ver.")) {
+            throw "FileVersion '$($info.FileVersion)' tidak diawali '$ver.'"
+          }
+
+          $name = "pilihanmu-picker_${ver}_windows_amd64"
+          $stage = "dist/$name"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item $exe.FullName "$stage/$($exe.Name)"
+          Copy-Item LICENSE, README.md $stage
+          Compress-Archive -Path $stage -DestinationPath "dist/$name.zip" -Force
+          Get-ChildItem dist
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-zip
+          path: dist/*.zip
+          if-no-files-found: error
+
+  linux:
+    name: Linux (tar.gz)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          check-latest: true
+          cache: true
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev libwayland-dev libxkbcommon-dev
+
+      - name: Build binary and tarball
+        shell: bash
+        run: |
+          set -euo pipefail
+          VER="${GITHUB_REF_NAME#v}"
+          NAME="pilihanmu-picker_${VER}_linux_amd64"
+
+          mkdir -p "dist/${NAME}"
+          go build -trimpath -ldflags "-s -w -X main.version=${GITHUB_REF_NAME}" \
+            -o "dist/${NAME}/pilihanmu-picker" ./cmd/pilihanmu-picker
+          cp LICENSE README.md "dist/${NAME}/"
+          tar -C dist -czf "dist/${NAME}.tar.gz" "${NAME}"
+
+          ls -la dist
+          # Bukti bahwa penyuntikan versi benar-benar masuk ke binary.
+          #
+          # WAJIB `grep -Fx` (cocok baris utuh). `grep -F` biasa TIDAK sah:
+          # string tag juga muncul di path modul dependensi (terukur: 24
+          # kecocokan palsu pada build tanpa suntikan), jadi gate-nya akan
+          # hijau walaupun penyuntikan gagal. Dengan `-Fx`, build tanpa
+          # suntikan menghasilkan 0 dan build tersuntik menghasilkan 1.
+          strings "dist/${NAME}/pilihanmu-picker" | grep -Fx "${GITHUB_REF_NAME}" \
+            || { echo "versi ${GITHUB_REF_NAME} tidak tertanam di binary"; exit 1; }
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-targz
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: GitHub Release
+    needs: [ windows, linux ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum ./*.zip ./*.tar.gz > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "Pilihanmu Picker ${GITHUB_REF_NAME}" \
+            --generate-notes \
+            dist/*.zip dist/*.tar.gz dist/SHA256SUMS

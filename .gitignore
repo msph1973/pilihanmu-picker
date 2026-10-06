@@ -17,9 +17,15 @@ fyne-cross/
 bin/
 dist/
 
+# Fyne packaging artifacts (dibuat lalu dihapus oleh `fyne package`)
+*.syso
+*.ico
+*.manifest
+
 # Archives and large files
 *.zip
 *.tar.gz
+*.tar.xz
 *.rar
 
 # OS artifacts
