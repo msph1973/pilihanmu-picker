@@ -264,6 +264,9 @@ jobs:
           tab=$'\t'
 
           tmp="$(mktemp -d)"
+          # `unzip -d` membuat direktorinya sendiri, `tar -C` TIDAK — tanpa
+          # mkdir ini tar gagal dengan "Cannot open: No such file or directory".
+          mkdir -p "$tmp/win" "$tmp/lin"
           unzip -q dist/*.zip -d "$tmp/win"
           tar -xzf dist/*.tar.gz -C "$tmp/lin"
 
