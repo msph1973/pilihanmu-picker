@@ -169,7 +169,8 @@ Ini bagian yang paling menentukan. Semua harus teruji sebelum GUI disentuh.
 ### Fase 4 — Paket & rilis — SELESAI (2026-10-06)
 - `cmd/pilihanmu-picker/FyneApp.toml` + `Icon.png` (monogram Pilihanmu) →
   `.exe` ber-ikon dan bermetadata
-- `.github/workflows/release.yml`: tag `v*` → `.zip` Windows + `.tar.gz` Linux
+- `.github/workflows/release.yml`: tag `v*` → gerbang verifikasi (tag harus di
+  `main` + lulus gofmt/vet/test) → `.zip` Windows + `.tar.gz` Linux
   + `SHA256SUMS` + GitHub Release
 - **AppImage Linux diganti `.tar.gz`** (keputusan pemilik 2026-10-06; PRD §5
   sudah diperbarui)
